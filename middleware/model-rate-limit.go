@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/common/limiter"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/gin-gonic/gin"
@@ -168,6 +169,11 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		// 在每个请求时检查是否启用限流
 		if !setting.ModelRequestRateLimitEnabled {
+			c.Next()
+			return
+		}
+
+		if model.IsPrivilegedUser(c.GetInt("id")) {
 			c.Next()
 			return
 		}

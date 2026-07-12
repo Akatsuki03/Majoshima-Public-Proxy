@@ -50,6 +50,7 @@ type User struct {
 	Setting          string                     `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string                     `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string                     `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	LastUserAgent    string                     `json:"last_user_agent,omitempty" gorm:"type:varchar(512);column:last_user_agent;default:''"`
 	CreatedAt        int64                      `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt      int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 	AdminPermissions map[string]map[string]bool `json:"admin_permissions,omitempty" gorm:"-:all"`
@@ -918,6 +919,13 @@ func ResetUserPasswordByEmail(email string, password string) error {
 }
 
 func IsAdmin(userId int) bool {
+	return IsPrivilegedUser(userId)
+}
+
+// IsPrivilegedUser reports whether the user is an admin or super-admin.
+// Privileged users are exempt from operational limits such as test penalty,
+// model request rate limits, and global input token caps.
+func IsPrivilegedUser(userId int) bool {
 	if userId == 0 {
 		return false
 	}
@@ -1124,6 +1132,20 @@ func GetRootUser() (user *User) {
 func UpdateUserLastLoginAt(id int) {
 	if err := DB.Model(&User{}).Where("id = ?", id).Update("last_login_at", common.GetTimestamp()).Error; err != nil {
 		common.SysLog("failed to update user last_login_at: " + err.Error())
+	}
+}
+
+// UpdateUserLastUserAgent records the latest client user agent seen for the user.
+func UpdateUserLastUserAgent(id int, userAgent string) {
+	if userAgent == "" {
+		return
+	}
+	if len(userAgent) > 512 {
+		userAgent = userAgent[:512]
+	}
+	err := DB.Model(&User{}).Where("id = ?", id).Update("last_user_agent", userAgent).Error
+	if err != nil {
+		common.SysLog("failed to update user last user agent: " + err.Error())
 	}
 }
 

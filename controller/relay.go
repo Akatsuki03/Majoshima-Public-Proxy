@@ -125,11 +125,19 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	common.SetContextKey(c, constant.ContextKeyRequestToolCall, service.RequestContainsToolCall(request))
 
+	if ua := c.Request.UserAgent(); ua != "" {
+		userId := c.GetInt("id")
+		gopool.Go(func() {
+			model.UpdateUserLastUserAgent(userId, ua)
+		})
+	}
+
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
+	needTestPenalty := operation_setting.GetTestPenaltySetting().Enabled
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
-	if needSensitiveCheck || needCountToken {
+	if needSensitiveCheck || needCountToken || needTestPenalty {
 		meta = request.GetTokenCountMeta()
 	} else {
 		meta = fastTokenCountMetaForPricing(request)
@@ -144,6 +152,17 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 	}
 
+	userId := c.GetInt("id")
+	privilegedUser := model.IsPrivilegedUser(userId)
+
+	if needTestPenalty && !privilegedUser && meta != nil && service.IsSillyTavernTestMessage(meta.CombineText) {
+		tokenId := c.GetInt("token_id")
+		tokenName := c.GetString("token_name")
+		modelName := c.GetString("original_model")
+		newAPIError = service.ChargeTestPenalty(c, userId, tokenId, tokenName, modelName)
+		return
+	}
+
 	tokens, err := service.EstimateRequestToken(c, meta, relayInfo)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeCountTokenFailed)
@@ -151,6 +170,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	relayInfo.SetEstimatePromptTokens(tokens)
+
+	inputLimitSetting := operation_setting.GetInputLimitSetting()
+	if !privilegedUser && inputLimitSetting.MaxInputTokens > 0 && tokens > inputLimitSetting.MaxInputTokens {
+		newAPIError = types.NewError(
+			fmt.Errorf("输入 token 数 (%d) 超过全局上限 (%d)", tokens, inputLimitSetting.MaxInputTokens),
+			types.ErrorCodeInvalidRequest,
+		)
+		return
+	}
 
 	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
 	if err != nil {
