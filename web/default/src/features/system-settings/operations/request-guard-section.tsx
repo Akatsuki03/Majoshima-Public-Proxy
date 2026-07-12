@@ -44,22 +44,26 @@ import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 
 const schema = z.object({
-  enabled: z.boolean(),
-  minQuota: z.coerce.number().int().min(0),
-  maxQuota: z.coerce.number().int().min(0),
-  minBalance: z.coerce.number().min(0),
+  penaltyEnabled: z.boolean(),
+  penaltyAmount: z.coerce.number().min(0),
+  penaltyMinInputTokens: z.coerce.number().int().min(0),
+  maxInputTokens: z.coerce.number().int().min(0),
 })
 
 type Values = z.infer<typeof schema>
 
-export function CheckinSettingsSection({
+/**
+ * Request guard settings: test-message penalty (input token threshold based)
+ * and the global input token cap. Admin and root users are exempt from both.
+ */
+export function RequestGuardSection({
   defaultValues,
 }: {
   defaultValues: {
-    enabled: boolean
-    minQuota: number
-    maxQuota: number
-    minBalance: number
+    penaltyEnabled: boolean
+    penaltyAmount: number
+    penaltyMinInputTokens: number
+    maxInputTokens: number
   }
 }) {
   const { t } = useTranslation()
@@ -68,44 +72,41 @@ export function CheckinSettingsSection({
   const form = useForm<Values>({
     resolver: zodResolver(schema) as unknown as Resolver<Values>,
     defaultValues: {
-      enabled: defaultValues.enabled,
-      minQuota: defaultValues.minQuota,
-      maxQuota: defaultValues.maxQuota,
-      minBalance: defaultValues.minBalance,
+      penaltyEnabled: defaultValues.penaltyEnabled,
+      penaltyAmount: defaultValues.penaltyAmount,
+      penaltyMinInputTokens: defaultValues.penaltyMinInputTokens,
+      maxInputTokens: defaultValues.maxInputTokens,
     },
   })
 
   const { isDirty, isSubmitting } = form.formState
-  const enabled = form.watch('enabled')
+  const penaltyEnabled = form.watch('penaltyEnabled')
 
   async function onSubmit(values: Values) {
     const updates: Array<{ key: string; value: string }> = []
 
-    if (values.enabled !== defaultValues.enabled) {
+    if (values.penaltyEnabled !== defaultValues.penaltyEnabled) {
       updates.push({
-        key: 'checkin_setting.enabled',
-        value: String(values.enabled),
+        key: 'test_penalty_setting.enabled',
+        value: String(values.penaltyEnabled),
       })
     }
-
-    if (values.minQuota !== defaultValues.minQuota) {
+    if (values.penaltyAmount !== defaultValues.penaltyAmount) {
       updates.push({
-        key: 'checkin_setting.min_quota',
-        value: String(values.minQuota),
+        key: 'test_penalty_setting.amount',
+        value: String(values.penaltyAmount),
       })
     }
-
-    if (values.maxQuota !== defaultValues.maxQuota) {
+    if (values.penaltyMinInputTokens !== defaultValues.penaltyMinInputTokens) {
       updates.push({
-        key: 'checkin_setting.max_quota',
-        value: String(values.maxQuota),
+        key: 'test_penalty_setting.min_input_tokens',
+        value: String(values.penaltyMinInputTokens),
       })
     }
-
-    if (values.minBalance !== defaultValues.minBalance) {
+    if (values.maxInputTokens !== defaultValues.maxInputTokens) {
       updates.push({
-        key: 'checkin_setting.min_balance',
-        value: String(values.minBalance),
+        key: 'input_limit_setting.max_input_tokens',
+        value: String(values.maxInputTokens),
       })
     }
 
@@ -122,25 +123,26 @@ export function CheckinSettingsSection({
   }
 
   return (
-    <SettingsSection title={t('Check-in Settings')}>
+    <SettingsSection title={t('Request Guard')}>
       <Form {...form}>
         <SettingsForm onSubmit={form.handleSubmit(onSubmit)} autoComplete='off'>
           <SettingsPageFormActions
             onSave={form.handleSubmit(onSubmit)}
             isSaving={updateOption.isPending || isSubmitting}
             isSaveDisabled={!isDirty}
-            saveLabel='Save check-in settings'
+            saveLabel='Save request guard settings'
           />
+
           <FormField
             control={form.control}
-            name='enabled'
+            name='penaltyEnabled'
             render={({ field }) => (
               <SettingsSwitchItem>
                 <SettingsSwitchContent>
-                  <FormLabel>{t('Enable check-in feature')}</FormLabel>
+                  <FormLabel>{t('Enable test message penalty')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Allow users to check in daily for random quota rewards'
+                      'Charge a penalty when the input token count is below the threshold. Admins are exempt'
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>
@@ -155,24 +157,21 @@ export function CheckinSettingsSection({
             )}
           />
 
-          {enabled && (
+          {penaltyEnabled && (
             <div className='grid gap-6 sm:grid-cols-2'>
               <FormField
                 control={form.control}
-                name='minQuota'
+                name='penaltyMinInputTokens'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Minimum check-in quota')}</FormLabel>
+                    <FormLabel>{t('Minimum input tokens')}</FormLabel>
                     <FormControl>
-                      <Input
-                        type='number'
-                        min={0}
-                        placeholder={t('1000')}
-                        {...field}
-                      />
+                      <Input type='number' min={0} {...field} />
                     </FormControl>
                     <FormDescription>
-                      {t('Minimum quota amount awarded for check-in')}
+                      {t(
+                        'Requests with fewer input tokens are treated as test messages. 0 disables the check'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -181,39 +180,15 @@ export function CheckinSettingsSection({
 
               <FormField
                 control={form.control}
-                name='maxQuota'
+                name='penaltyAmount'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Maximum check-in quota')}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type='number'
-                        min={0}
-                        placeholder={t('10000')}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t('Maximum quota amount awarded for check-in')}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='minBalance'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Check-in balance threshold ($)')}</FormLabel>
+                    <FormLabel>{t('Penalty amount ($)')}</FormLabel>
                     <FormControl>
                       <Input type='number' min={0} step='0.01' {...field} />
                     </FormControl>
                     <FormDescription>
-                      {t(
-                        'Only users with balance below this value can check in. 0 disables the limit'
-                      )}
+                      {t('Amount deducted when a test message is detected')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -221,6 +196,25 @@ export function CheckinSettingsSection({
               />
             </div>
           )}
+
+          <FormField
+            control={form.control}
+            name='maxInputTokens'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Global max input tokens')}</FormLabel>
+                <FormControl>
+                  <Input type='number' min={0} {...field} />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Reject requests whose input token count exceeds this cap. 0 disables the limit. Admins are exempt'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </SettingsForm>
       </Form>
     </SettingsSection>

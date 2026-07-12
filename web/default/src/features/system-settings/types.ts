@@ -136,6 +136,9 @@ export type AuthSettings = {
   'discord.enabled': boolean
   'discord.client_id': string
   'discord.client_secret': string
+  'discord.server_id': string
+  'discord.role_id': string
+  'discord.guild_configs': string
   'oidc.enabled': boolean
   'oidc.client_id': string
   'oidc.client_secret': string
@@ -328,6 +331,7 @@ export type BillingSettings = {
   'checkin_setting.enabled': boolean
   'checkin_setting.min_quota': number
   'checkin_setting.max_quota': number
+  'checkin_setting.min_balance': number
 }
 
 export type OperationsSettings = {
@@ -360,6 +364,10 @@ export type OperationsSettings = {
   'perf_metrics_setting.flush_interval': number
   'perf_metrics_setting.bucket_time': 'hour' | 'minute' | '5min'
   'perf_metrics_setting.retention_days': number
+  'test_penalty_setting.enabled': boolean
+  'test_penalty_setting.amount': number
+  'test_penalty_setting.min_input_tokens': number
+  'input_limit_setting.max_input_tokens': number
 }
 
 export type SecuritySettings = {

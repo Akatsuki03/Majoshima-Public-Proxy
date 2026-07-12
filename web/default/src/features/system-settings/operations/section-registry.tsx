@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { SystemBehaviorSection } from '../general/system-behavior-section'
+import { RequestGuardSection } from './request-guard-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
 import { WorkerSettingsSection } from '../integrations/worker-settings-section'
@@ -36,6 +37,21 @@ const OPERATIONS_SECTIONS = [
           DefaultCollapseSidebar: settings.DefaultCollapseSidebar,
           DemoSiteEnabled: settings.DemoSiteEnabled,
           SelfUseModeEnabled: settings.SelfUseModeEnabled,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'request-guard',
+    titleKey: 'Request Guard',
+    build: (settings: OperationsSettings) => (
+      <RequestGuardSection
+        defaultValues={{
+          penaltyEnabled: settings['test_penalty_setting.enabled'],
+          penaltyAmount: settings['test_penalty_setting.amount'],
+          penaltyMinInputTokens:
+            settings['test_penalty_setting.min_input_tokens'],
+          maxInputTokens: settings['input_limit_setting.max_input_tokens'],
         }}
       />
     ),

@@ -87,6 +87,8 @@ function buildSearchSourceKey(values: {
   username?: unknown
   requestId?: unknown
   upstreamRequestId?: unknown
+  userAgent?: unknown
+  toolCall?: unknown
   type?: unknown
 }) {
   return [
@@ -99,6 +101,8 @@ function buildSearchSourceKey(values: {
     values.username,
     values.requestId,
     values.upstreamRequestId,
+    values.userAgent,
+    values.toolCall,
     Array.isArray(values.type) ? values.type.join(',') : values.type,
   ]
     .map((value) => String(value ?? ''))
@@ -132,6 +136,8 @@ export function CommonLogsFilterBar<TData>(
       username: searchParams.username,
       requestId: searchParams.requestId,
       upstreamRequestId: searchParams.upstreamRequestId,
+      userAgent: searchParams.userAgent,
+      toolCall: searchParams.toolCall,
       type: searchParams.type,
     }
     const filters: CommonLogFilters = {
@@ -146,6 +152,8 @@ export function CommonLogsFilterBar<TData>(
       username: searchParams.username || undefined,
       requestId: searchParams.requestId || undefined,
       upstreamRequestId: searchParams.upstreamRequestId || undefined,
+      userAgent: searchParams.userAgent || undefined,
+      toolCall: searchParams.toolCall || undefined,
     }
     return {
       sourceKey: buildSearchSourceKey(sourceValues),
@@ -162,6 +170,8 @@ export function CommonLogsFilterBar<TData>(
     searchParams.username,
     searchParams.requestId,
     searchParams.upstreamRequestId,
+    searchParams.userAgent,
+    searchParams.toolCall,
     searchParams.type,
   ])
   const [draft, setDraft] = useState<CommonLogDraft>(() => searchState)
@@ -238,7 +248,9 @@ export function CommonLogsFilterBar<TData>(
     !!filters.username ||
     !!filters.channel ||
     !!filters.requestId ||
-    !!filters.upstreamRequestId
+    !!filters.upstreamRequestId ||
+    !!filters.userAgent ||
+    (!!filters.toolCall && filters.toolCall !== '0')
 
   const hasTypeFilter = logType !== LOG_TYPE_ALL_VALUE
   const hasAdditionalFilters =
@@ -250,6 +262,8 @@ export function CommonLogsFilterBar<TData>(
     isAdmin ? filters.channel : undefined,
     filters.requestId,
     filters.upstreamRequestId,
+    filters.userAgent,
+    filters.toolCall && filters.toolCall !== '0' ? filters.toolCall : undefined,
   ].filter(Boolean).length
   const sensitiveType = sensitiveVisible ? 'text' : 'password'
   const logTypeItems = useMemo(
@@ -262,6 +276,18 @@ export function CommonLogsFilterBar<TData>(
   )
   const logTypeLabel =
     logTypeItems.find((type) => type.value === logType)?.label ?? t('All Types')
+
+  const toolCallItems = useMemo(
+    () => [
+      { value: '0', label: t('Tool Call: All') },
+      { value: '1', label: t('Tool Call: With') },
+      { value: '2', label: t('Tool Call: Without') },
+    ],
+    [t]
+  )
+  const toolCallLabel =
+    toolCallItems.find((item) => item.value === (filters.toolCall || '0'))
+      ?.label ?? t('Tool Call: All')
 
   const statsBar = (
     <div className='flex flex-wrap items-center gap-2'>
@@ -405,6 +431,36 @@ export function CommonLogsFilterBar<TData>(
           onChange={(e) => handleChange('upstreamRequestId', e.target.value)}
           onKeyDown={handleKeyDown}
         />
+      </LogsFilterField>
+      <LogsFilterField>
+        <LogsFilterInput
+          placeholder={t('User Agent')}
+          value={filters.userAgent || ''}
+          onChange={(e) => handleChange('userAgent', e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+      </LogsFilterField>
+      <LogsFilterField>
+        <Select
+          items={toolCallItems}
+          value={filters.toolCall || '0'}
+          onValueChange={(value) =>
+            handleChange('toolCall', value === null ? '0' : String(value))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue>{toolCallLabel}</SelectValue>
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false}>
+            <SelectGroup>
+              {toolCallItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </LogsFilterField>
     </>
   )

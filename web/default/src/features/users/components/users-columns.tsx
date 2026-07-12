@@ -378,6 +378,27 @@ export function useUsersColumns(): ColumnDef<User>[] {
       meta: { mobileHidden: true },
     },
     {
+      accessorKey: 'last_user_agent',
+      header: t('Last User Agent'),
+      cell: ({ row }) => {
+        const userAgent = row.getValue('last_user_agent') as string | undefined
+        if (!userAgent) {
+          return <span className='text-muted-foreground/40 text-sm'>-</span>
+        }
+        return (
+          <span
+            className='text-muted-foreground block max-w-[160px] truncate font-mono text-xs'
+            title={userAgent}
+          >
+            {userAgent}
+          </span>
+        )
+      },
+      size: 160,
+      enableSorting: false,
+      meta: { mobileHidden: true },
+    },
+    {
       id: 'actions',
       header: () => t('Actions'),
       cell: ({ row }) => <DataTableRowActions row={row} />,

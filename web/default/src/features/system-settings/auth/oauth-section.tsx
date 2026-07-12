@@ -18,15 +18,17 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useForm } from 'react-hook-form'
+import { useFieldArray, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
 import { CopyButton } from '@/components/copy-button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Form,
   FormControl,
@@ -69,6 +71,15 @@ const oauthSchema = z.object({
     enabled: z.boolean(),
     client_id: z.string(),
     client_secret: z.string(),
+    server_id: z.string(),
+    role_id: z.string(),
+    guild_configs: z.array(
+      z.object({
+        server_id: z.string(),
+        role_ids: z.array(z.string()),
+        allow_register: z.boolean(),
+      })
+    ),
   }),
   oidc: z.object({
     enabled: z.boolean(),
@@ -101,6 +112,9 @@ type FlatOAuthDefaults = {
   'discord.enabled': boolean
   'discord.client_id': string
   'discord.client_secret': string
+  'discord.server_id': string
+  'discord.role_id': string
+  'discord.guild_configs': string
   'oidc.enabled': boolean
   'oidc.client_id': string
   'oidc.client_secret': string
@@ -173,6 +187,43 @@ function OAuthSetupGuide(props: OAuthSetupGuideProps) {
   )
 }
 
+type DiscordGuildConfig = {
+  server_id: string
+  role_ids: string[]
+  allow_register: boolean
+}
+
+const parseGuildConfigs = (raw: string): DiscordGuildConfig[] => {
+  if (!raw || raw === 'null') return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((item) => {
+      const entry = item as Partial<DiscordGuildConfig>
+      return {
+        server_id: typeof entry.server_id === 'string' ? entry.server_id : '',
+        role_ids: Array.isArray(entry.role_ids)
+          ? entry.role_ids.filter((r): r is string => typeof r === 'string')
+          : [],
+        allow_register: entry.allow_register !== false,
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
+const serializeGuildConfigs = (configs: DiscordGuildConfig[]): string => {
+  const sanitized = configs
+    .map((cfg) => ({
+      server_id: cfg.server_id.trim(),
+      role_ids: cfg.role_ids.map((r) => r.trim()).filter((r) => r !== ''),
+      allow_register: cfg.allow_register,
+    }))
+    .filter((cfg) => cfg.server_id !== '')
+  return JSON.stringify(sanitized)
+}
+
 const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
   GitHubOAuthEnabled: defaults.GitHubOAuthEnabled,
   GitHubClientId: defaults.GitHubClientId ?? '',
@@ -181,6 +232,9 @@ const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
     enabled: defaults['discord.enabled'],
     client_id: defaults['discord.client_id'] ?? '',
     client_secret: defaults['discord.client_secret'] ?? '',
+    server_id: defaults['discord.server_id'] ?? '',
+    role_id: defaults['discord.role_id'] ?? '',
+    guild_configs: parseGuildConfigs(defaults['discord.guild_configs'] ?? ''),
   },
   oidc: {
     enabled: defaults['oidc.enabled'],
@@ -211,6 +265,9 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   'discord.enabled': values.discord.enabled,
   'discord.client_id': values.discord.client_id,
   'discord.client_secret': values.discord.client_secret,
+  'discord.server_id': values.discord.server_id,
+  'discord.role_id': values.discord.role_id,
+  'discord.guild_configs': serializeGuildConfigs(values.discord.guild_configs),
   'oidc.enabled': values.oidc.enabled,
   'oidc.client_id': values.oidc.client_id,
   'oidc.client_secret': values.oidc.client_secret,
@@ -230,6 +287,144 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   WeChatServerToken: values.WeChatServerToken,
   WeChatAccountQRCodeImageURL: values.WeChatAccountQRCodeImageURL,
 })
+
+type DiscordGuildConfigsEditorProps = {
+  form: ReturnType<typeof useForm<OAuthFormValues>>
+}
+
+/**
+ * Editor for Discord multi-guild/role verification rules.
+ * A user passing any rule may log in; new users can register only when at
+ * least one matched rule has allow_register enabled. Empty role list means
+ * guild membership alone qualifies.
+ */
+function DiscordGuildConfigsEditor(props: DiscordGuildConfigsEditorProps) {
+  const { t } = useTranslation()
+  const fieldArray = useFieldArray({
+    control: props.form.control,
+    name: 'discord.guild_configs',
+  })
+
+  return (
+    <div className='space-y-3 lg:col-span-2'>
+      <div>
+        <div className='text-sm font-medium'>
+          {t('Multi-server / role verification rules')}
+        </div>
+        <p className='text-muted-foreground mt-1 text-sm'>
+          {t(
+            'Users matching any rule can log in. New users can register only when at least one matched rule allows registration. Leave roles empty to only require server membership. When rules are configured, the legacy single-server fields are ignored.'
+          )}
+        </p>
+      </div>
+
+      {fieldArray.fields.map((row, index) => (
+        <Card key={row.id} className='py-4'>
+          <CardContent className='grid gap-4 px-4 lg:grid-cols-[1fr_1fr_auto_auto]'>
+            <FormField
+              control={props.form.control}
+              name={`discord.guild_configs.${index}.server_id`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Server ID')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Discord server (guild) ID')}
+                      autoComplete='off'
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={props.form.control}
+              name={`discord.guild_configs.${index}.role_ids`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Role IDs')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t(
+                        'Comma-separated role IDs, any one qualifies'
+                      )}
+                      autoComplete='off'
+                      value={(field.value ?? []).join(',')}
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.value
+                            .split(',')
+                            .map((r) => r.trim())
+                            .filter((r) => r !== '')
+                        )
+                      }
+                      name={field.name}
+                      onBlur={field.onBlur}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Leave empty to only require server membership')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={props.form.control}
+              name={`discord.guild_configs.${index}.allow_register`}
+              render={({ field }) => (
+                <FormItem className='flex flex-col'>
+                  <FormLabel>{t('Allow register')}</FormLabel>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <div className='flex items-end'>
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                aria-label={t('Remove rule')}
+                onClick={() => fieldArray.remove(index)}
+              >
+                <Trash2 className='size-4' />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button
+        type='button'
+        variant='outline'
+        size='sm'
+        onClick={() =>
+          fieldArray.append({
+            server_id: '',
+            role_ids: [],
+            allow_register: true,
+          })
+        }
+      >
+        <Plus className='size-4' />
+        {t('Add server rule')}
+      </Button>
+    </div>
+  )
+}
 
 type OAuthSectionProps = {
   defaultValues: FlatOAuthDefaults
@@ -563,6 +758,8 @@ export function OAuthSection(props: OAuthSectionProps) {
                     </FormItem>
                   )}
                 />
+
+                <DiscordGuildConfigsEditor form={form} />
               </TabsContent>
 
               <TabsContent value='oidc' className={oauthTabContentClassName}>

@@ -53,6 +53,9 @@ export interface CommonLogFilters extends CommonFilters {
   username?: string
   requestId?: string
   upstreamRequestId?: string
+  userAgent?: string
+  /** 0 = no filter, 1 = only with tool call, 2 = only without tool call */
+  toolCall?: string
 }
 
 /**

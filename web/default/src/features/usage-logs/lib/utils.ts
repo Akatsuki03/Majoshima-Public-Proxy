@@ -215,6 +215,12 @@ export function buildApiParams(config: {
     ...(searchParams.upstreamRequestId
       ? { upstream_request_id: String(searchParams.upstreamRequestId) }
       : {}),
+    ...(searchParams.userAgent
+      ? { user_agent: String(searchParams.userAgent) }
+      : {}),
+    ...(searchParams.toolCall && String(searchParams.toolCall) !== '0'
+      ? { tool_call: Number(searchParams.toolCall) || 0 }
+      : {}),
     ...buildTimeRangeParams(searchParams, false),
   }
 

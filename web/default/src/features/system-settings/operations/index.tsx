@@ -56,6 +56,10 @@ const defaultOperationsSettings: OperationsSettings = {
   'perf_metrics_setting.flush_interval': 5,
   'perf_metrics_setting.bucket_time': 'hour',
   'perf_metrics_setting.retention_days': 0,
+  'test_penalty_setting.enabled': false,
+  'test_penalty_setting.amount': 1000,
+  'test_penalty_setting.min_input_tokens': 0,
+  'input_limit_setting.max_input_tokens': 0,
 }
 
 export function OperationsSettings() {

@@ -768,6 +768,42 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
     },
 
     {
+      accessorKey: 'user_agent',
+      header: t('User Agent'),
+      cell: ({ row }) => {
+        const log = row.original
+        if (!isDisplayableLogType(log.type)) return null
+        const userAgent = log.user_agent
+        if (!userAgent) {
+          return <span className='text-muted-foreground/40 text-xs'>—</span>
+        }
+        return (
+          <span
+            className='text-muted-foreground block max-w-[160px] truncate font-mono text-xs'
+            title={userAgent}
+          >
+            {userAgent}
+          </span>
+        )
+      },
+      size: 160,
+      maxSize: 180,
+    },
+    {
+      accessorKey: 'tool_call',
+      header: t('Tool Call'),
+      cell: ({ row }) => {
+        const log = row.original
+        if (!isDisplayableLogType(log.type)) return null
+        if (!log.tool_call) {
+          return <span className='text-muted-foreground/40 text-xs'>—</span>
+        }
+        return <StatusBadge variant='info'>{t('Tool Call')}</StatusBadge>
+      },
+      size: 90,
+    },
+
+    {
       accessorKey: 'content',
       header: t('Details'),
       cell: function DetailsCell({ row }) {
