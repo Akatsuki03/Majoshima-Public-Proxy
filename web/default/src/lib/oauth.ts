@@ -40,7 +40,8 @@ export function buildDiscordOAuthUrl(clientId: string, state: string): string {
     `${window.location.origin}/oauth/discord`
   )
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', 'identify+openid')
+  // URLSearchParams 会把空格编码成 "+"（Discord 要求的 scope 分隔符）
+  url.searchParams.set('scope', 'identify openid guilds guilds.members.read')
   url.searchParams.set('state', state)
   return url.toString()
 }
