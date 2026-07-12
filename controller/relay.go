@@ -134,10 +134,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
-	needTestPenalty := operation_setting.GetTestPenaltySetting().Enabled
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
-	if needSensitiveCheck || needCountToken || needTestPenalty {
+	if needSensitiveCheck || needCountToken {
 		meta = request.GetTokenCountMeta()
 	} else {
 		meta = fastTokenCountMetaForPricing(request)
@@ -155,14 +154,6 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	userId := c.GetInt("id")
 	privilegedUser := model.IsPrivilegedUser(userId)
 
-	if needTestPenalty && !privilegedUser && meta != nil && service.IsSillyTavernTestMessage(meta.CombineText) {
-		tokenId := c.GetInt("token_id")
-		tokenName := c.GetString("token_name")
-		modelName := c.GetString("original_model")
-		newAPIError = service.ChargeTestPenalty(c, userId, tokenId, tokenName, modelName)
-		return
-	}
-
 	tokens, err := service.EstimateRequestToken(c, meta, relayInfo)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeCountTokenFailed)
@@ -170,6 +161,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	relayInfo.SetEstimatePromptTokens(tokens)
+
+	// Test penalty: input token count below configured threshold is treated as a test message
+	if !privilegedUser && service.IsTestInputBelowThreshold(tokens) {
+		tokenId := c.GetInt("token_id")
+		tokenName := c.GetString("token_name")
+		modelName := c.GetString("original_model")
+		newAPIError = service.ChargeTestPenalty(c, userId, tokenId, tokenName, modelName, tokens)
+		return
+	}
 
 	inputLimitSetting := operation_setting.GetInputLimitSetting()
 	if !privilegedUser && inputLimitSetting.MaxInputTokens > 0 && tokens > inputLimitSetting.MaxInputTokens {

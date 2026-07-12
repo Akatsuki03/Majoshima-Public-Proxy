@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -14,27 +13,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var testPatterns = []string{
-	"just say test",
-	"just say \"test\"",
-	"simply reply with \"test\"",
-	"reply with the word \"test\"",
-	"say the word \"test\"",
-	"respond with \"test\"",
-	"just respond with test",
-}
-
-func IsSillyTavernTestMessage(combineText string) bool {
-	lower := strings.ToLower(strings.TrimSpace(combineText))
-	for _, pattern := range testPatterns {
-		if strings.Contains(lower, pattern) {
-			return true
-		}
+// IsTestInputBelowThreshold reports whether the estimated input token count is
+// below the configured minimum, which is treated as a test/probe message.
+func IsTestInputBelowThreshold(tokens int) bool {
+	settings := operation_setting.GetTestPenaltySetting()
+	if !settings.Enabled || settings.MinInputTokens <= 0 {
+		return false
 	}
-	return false
+	return tokens < settings.MinInputTokens
 }
 
-func ChargeTestPenalty(c *gin.Context, userId int, tokenId int, tokenName string, modelName string) *types.NewAPIError {
+// ChargeTestPenalty deducts the configured penalty from the user and returns a
+// non-retryable error describing the rejection.
+func ChargeTestPenalty(c *gin.Context, userId int, tokenId int, tokenName string, modelName string, tokens int) *types.NewAPIError {
 	settings := operation_setting.GetTestPenaltySetting()
 	if !settings.Enabled || settings.Amount <= 0 {
 		return nil
@@ -57,14 +48,14 @@ func ChargeTestPenalty(c *gin.Context, userId int, tokenId int, tokenName string
 		ModelName: modelName,
 		TokenName: tokenName,
 		Quota:     int(penaltyQuota),
-		Content:   fmt.Sprintf("Test penalty: $%.2f deducted for sending test message", settings.Amount),
+		Content:   fmt.Sprintf("Test penalty: $%.2f deducted, input tokens (%d) below minimum threshold (%d)", settings.Amount, tokens, settings.MinInputTokens),
 		TokenId:   tokenId,
 	})
 
-	logger.LogWarn(c, fmt.Sprintf("test penalty charged: user=%d, amount=$%.2f, quota=%d", userId, settings.Amount, penaltyQuota))
+	logger.LogWarn(c, fmt.Sprintf("test penalty charged: user=%d, amount=$%.2f, quota=%d, input_tokens=%d, threshold=%d", userId, settings.Amount, penaltyQuota, tokens, settings.MinInputTokens))
 
 	return types.NewErrorWithStatusCode(
-		fmt.Errorf("test message detected, penalty of $%.2f has been charged", settings.Amount),
+		fmt.Errorf("input tokens (%d) below minimum threshold (%d), test message detected, penalty of $%.2f has been charged", tokens, settings.MinInputTokens, settings.Amount),
 		types.ErrorCodeInvalidRequest,
 		403,
 		types.ErrOptionWithSkipRetry(),
