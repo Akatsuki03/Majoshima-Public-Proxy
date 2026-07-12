@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/types"
 
@@ -77,7 +78,37 @@ type Log struct {
 	Ip                string `json:"ip" gorm:"index;default:''"`
 	RequestId         string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
 	UpstreamRequestId string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
+	UserAgent         string `json:"user_agent" gorm:"type:varchar(512);index;default:''"`
+	ToolCall          bool   `json:"tool_call" gorm:"index;default:false"`
 	Other             string `json:"other"`
+}
+
+// log tool_call filter values passed from the API layer
+const (
+	ToolCallFilterNone    = 0 // no filter
+	ToolCallFilterWith    = 1 // only logs with tool call
+	ToolCallFilterWithout = 2 // only logs without tool call
+)
+
+// truncateUserAgent keeps the stored UA within the varchar(512) column limit.
+func truncateUserAgent(ua string) string {
+	if len(ua) > 512 {
+		return ua[:512]
+	}
+	return ua
+}
+
+// buildUserAgentLikePattern escapes the keyword and wraps it with % for fuzzy search
+// unless the caller already provided % wildcards.
+func buildUserAgentLikePattern(input string) (string, error) {
+	pattern, err := sanitizeLikePattern(input)
+	if err != nil {
+		return "", err
+	}
+	if !strings.Contains(input, "%") {
+		pattern = "%" + pattern + "%"
+	}
+	return pattern, nil
 }
 
 // don't use iota, avoid change log type value
@@ -317,6 +348,8 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		}(),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
+		UserAgent:         truncateUserAgent(c.Request.UserAgent()),
+		ToolCall:          common.GetContextKeyBool(c, constant.ContextKeyRequestToolCall),
 		Other:             otherStr,
 	}
 	err := createLog(log)
@@ -381,6 +414,8 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		}(),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
+		UserAgent:         truncateUserAgent(c.Request.UserAgent()),
+		ToolCall:          common.GetContextKeyBool(c, constant.ContextKeyRequestToolCall),
 		Other:             otherStr,
 	}
 	err := createLog(log)
@@ -465,7 +500,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string, userAgent string, toolCall int) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -487,6 +522,18 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	}
 	if upstreamRequestId != "" {
 		tx = tx.Where("logs.upstream_request_id = ?", upstreamRequestId)
+	}
+	if userAgent != "" {
+		userAgentPattern, err := buildUserAgentLikePattern(userAgent)
+		if err != nil {
+			return nil, 0, err
+		}
+		tx = tx.Where("logs.user_agent LIKE ? ESCAPE '!'", userAgentPattern)
+	}
+	if toolCall == ToolCallFilterWith {
+		tx = tx.Where("logs.tool_call = ?", true)
+	} else if toolCall == ToolCallFilterWithout {
+		tx = tx.Where("logs.tool_call = ?", false)
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("logs.created_at >= ?", startTimestamp)
@@ -561,7 +608,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 
 const logSearchCountLimit = 10000
 
-func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
+func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string, requestId string, upstreamRequestId string, userAgent string, toolCall int) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB.Where("logs.user_id = ?", userId)
@@ -580,6 +627,18 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	}
 	if upstreamRequestId != "" {
 		tx = tx.Where("logs.upstream_request_id = ?", upstreamRequestId)
+	}
+	if userAgent != "" {
+		userAgentPattern, err := buildUserAgentLikePattern(userAgent)
+		if err != nil {
+			return nil, 0, err
+		}
+		tx = tx.Where("logs.user_agent LIKE ? ESCAPE '!'", userAgentPattern)
+	}
+	if toolCall == ToolCallFilterWith {
+		tx = tx.Where("logs.tool_call = ?", true)
+	} else if toolCall == ToolCallFilterWithout {
+		tx = tx.Where("logs.tool_call = ?", false)
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("logs.created_at >= ?", startTimestamp)

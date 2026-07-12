@@ -63,6 +63,10 @@ const (
 	// It is not returned to end users, but can be persisted into consume/error logs for debugging.
 	ContextKeyAdminRejectReason ContextKey = "admin_reject_reason"
 
+	// ContextKeyRequestToolCall marks whether the relay request involves tool calls
+	// (tools declared in the request or tool call/result messages). Persisted into logs.
+	ContextKeyRequestToolCall ContextKey = "request_tool_call"
+
 	// ContextKeyLanguage stores the user's language preference for i18n
 	ContextKeyLanguage ContextKey = "language"
 	ContextKeyIsStream ContextKey = "is_stream"
