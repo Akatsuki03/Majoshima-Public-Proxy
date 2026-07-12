@@ -1,0 +1,52 @@
+name: Promote Dev to Main
+
+# 手动触发的晋升流程,保证 dev → main → stable 三个分支各差一次更新:
+#   1. stable ← 当前 main(备份,先执行)
+#   2. main   ← 当前 dev(晋升,触发 Zeabur 部署)
+# 回滚:main 出问题时手动将 stable force push 回 main。
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '输入 "promote" 确认执行晋升(stable←main, main←dev)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    if: inputs.confirm == 'promote'
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Backup main to stable
+        run: |
+          git fetch origin main dev
+          MAIN_SHA=$(git rev-parse origin/main)
+          echo "Backing up main ($MAIN_SHA) to stable"
+          git push origin "$MAIN_SHA:refs/heads/stable" --force
+
+      - name: Promote dev to main
+        run: |
+          DEV_SHA=$(git rev-parse origin/dev)
+          echo "Promoting dev ($DEV_SHA) to main"
+          git push origin "$DEV_SHA:refs/heads/main" --force
+
+      - name: Summary
+        run: |
+          echo "## Promotion complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- stable ← $(git rev-parse --short origin/main) (previous main)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- main   ← $(git rev-parse --short origin/dev) (promoted dev)" >> "$GITHUB_STEP_SUMMARY"

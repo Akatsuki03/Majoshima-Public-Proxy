@@ -1,0 +1,125 @@
+name: Sync Upstream to Dev
+
+# 每日自动拉取上游 QuantumNous/new-api 的 main 分支,合并到 dev。
+# 无冲突且构建通过 → 自动推送;冲突或构建失败 → 开 issue 提醒人工处理。
+
+on:
+  schedule:
+    - cron: '30 19 * * *' # 每日 UTC 19:30(北京时间凌晨 3:30)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/QuantumNous/new-api.git
+          git fetch upstream main
+
+      - name: Check for new upstream commits
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
+          echo "Upstream is $BEHIND commits ahead"
+
+      - name: Merge upstream
+        id: merge
+        if: steps.check.outputs.behind != '0'
+        continue-on-error: true
+        run: |
+          git merge upstream/main --no-edit -m "chore: merge upstream/main $(git rev-parse --short upstream/main)"
+
+      - name: Open issue on merge conflict
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Upstream sync conflict (${new Date().toISOString().slice(0, 10)})`,
+              body: [
+                '自动同步上游到 dev 时发生合并冲突,需要人工处理。',
+                '',
+                '本地解决步骤:',
+                '```bash',
+                'git checkout dev',
+                'git fetch https://github.com/QuantumNous/new-api.git main',
+                'git merge FETCH_HEAD',
+                '# 解决冲突后 push',
+                '```',
+              ].join('\n'),
+              labels: ['upstream-sync'],
+            })
+
+      - name: Abort failed merge
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'failure'
+        run: git merge --abort
+
+      - name: Set up Go
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'success'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Bun
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'success'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build frontends (gate)
+        id: build_fe
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'success'
+        continue-on-error: true
+        run: |
+          cd web
+          bun install --frozen-lockfile
+          cd default && DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build && cd ..
+          cd classic && VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build
+
+      - name: Build backend (gate)
+        id: build_go
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'success' && steps.build_fe.outcome == 'success'
+        continue-on-error: true
+        run: go build ./...
+
+      - name: Open issue on build failure
+        if: >-
+          steps.check.outputs.behind != '0' && steps.merge.outcome == 'success' &&
+          (steps.build_fe.outcome == 'failure' || steps.build_go.outcome == 'failure')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Upstream sync build failure (${new Date().toISOString().slice(0, 10)})`,
+              body: [
+                '上游合并本身无冲突,但合并后构建失败,未推送到 dev。',
+                `详见 workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n'),
+              labels: ['upstream-sync'],
+            })
+
+      - name: Push to dev
+        if: >-
+          steps.check.outputs.behind != '0' && steps.merge.outcome == 'success' &&
+          steps.build_fe.outcome == 'success' && steps.build_go.outcome == 'success'
+        run: git push origin dev
