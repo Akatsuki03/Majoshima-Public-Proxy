@@ -251,6 +251,10 @@ oauth.connect_failed: "無法連接至 {{.Provider}} 伺服器，請稍後重試
 oauth.token_failed: "{{.Provider}} 獲取 Token 失敗，請檢查設定"
 oauth.user_info_empty: "{{.Provider}} 獲取使用者資訊為空，請檢查設定"
 oauth.trust_level_low: "Linux DO 信任等級未達到管理員設定的最低信任等級"
+discord.not_guild_member: "您不是指定 Discord 伺服器的成員，無法登入"
+discord.missing_required_role: "您在 Discord 伺服器中沒有所需的角色，無法登入"
+discord.guild_check_failed: "Discord 伺服器驗證失敗，請稍後再試"
+discord.register_denied: "您所在的 Discord 伺服器/身分組目前已關閉新用戶註冊，老用戶仍可正常登入"
 
 # Model layer error messages
 redeem.failed: "兌換失敗，請稍後重試"

@@ -116,6 +116,8 @@ func HandleOAuth(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgOAuthUserDeleted)
 		case *OAuthRegistrationDisabledError:
 			common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
+		case *OAuthProviderRegistrationDeniedError:
+			common.ApiErrorI18n(c, i18n.MsgDiscordRegisterDenied)
 		case *OAuthEmailAlreadyTakenError:
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
 		default:
@@ -244,6 +246,13 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		return nil, &OAuthRegistrationDisabledError{}
 	}
 
+	// Provider-level registration control (e.g. Discord guild/role rules):
+	// existing users can still log in, but new user registration is denied
+	// unless at least one matched rule allows it.
+	if allowed, ok := oauthUser.Extra["register_allowed"].(bool); ok && !allowed {
+		return nil, &OAuthProviderRegistrationDeniedError{}
+	}
+
 	// Set up new user
 	user.Username = provider.GetProviderPrefix() + strconv.Itoa(model.GetMaxUserId()+1)
 
@@ -354,6 +363,15 @@ type OAuthRegistrationDisabledError struct{}
 
 func (e *OAuthRegistrationDisabledError) Error() string {
 	return "registration is disabled"
+}
+
+// OAuthProviderRegistrationDeniedError indicates the OAuth provider's own rules
+// (e.g. Discord guild/role config) deny new user registration, while existing
+// users may still log in.
+type OAuthProviderRegistrationDeniedError struct{}
+
+func (e *OAuthProviderRegistrationDeniedError) Error() string {
+	return "registration is not allowed for this account"
 }
 
 type OAuthEmailAlreadyTakenError struct{}
