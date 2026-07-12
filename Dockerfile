@@ -47,6 +47,12 @@ RUN apt-get update \
 
 COPY --from=builder2 /build/new-api /
 COPY LICENSE NOTICE THIRD-PARTY-LICENSES.md /licenses/
+
+ENV PORT=3000
+ENV TZ=Asia/Tokyo
+ENV GIN_MODE=release
+
 EXPOSE 3000
 WORKDIR /data
+VOLUME ["/data"]
 ENTRYPOINT ["/new-api"]
