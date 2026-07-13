@@ -311,7 +311,7 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 				}
 				lastClaudeMessage.Content = append(lastClaudeMessage.Content.([]dto.ClaudeMediaMessage), dto.ClaudeMediaMessage{
 					Type:      "tool_result",
-					ToolUseId: message.ToolCallId,
+					ToolUseId: sharedclaude.SanitizeToolId(message.ToolCallId),
 					Content:   message.Content,
 				})
 				claudeMessages[len(claudeMessages)-1] = lastClaudeMessage
@@ -322,7 +322,7 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 			claudeMessage.Content = []dto.ClaudeMediaMessage{
 				{
 					Type:      "tool_result",
-					ToolUseId: message.ToolCallId,
+					ToolUseId: sharedclaude.SanitizeToolId(message.ToolCallId),
 					Content:   message.Content,
 				},
 			}
@@ -380,7 +380,7 @@ func OpenAIChatRequestToClaudeMessages(c *gin.Context, textRequest dto.GeneralOp
 					}
 					claudeMediaMessages = append(claudeMediaMessages, dto.ClaudeMediaMessage{
 						Type:  "tool_use",
-						Id:    toolCall.ID,
+						Id:    sharedclaude.SanitizeToolId(toolCall.ID),
 						Name:  toolCall.Function.Name,
 						Input: inputObj,
 					})

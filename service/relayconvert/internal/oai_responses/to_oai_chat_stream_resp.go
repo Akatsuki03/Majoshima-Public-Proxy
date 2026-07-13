@@ -382,7 +382,10 @@ func (s *ResponsesToChatStreamState) toolDelta(tool *responsesStreamTool, explic
 	chunks := s.ensureStart()
 	callID := strings.TrimSpace(tool.CallID)
 	if callID == "" {
-		callID = tool.Key
+		// tool.Key is an internal index like "output:0" / "item:fc_1"; the colon
+		// is rejected by providers that validate tool call ids (e.g. Anthropic's
+		// ^[a-zA-Z0-9_-]+$), so convert it into a safe form before exposing it.
+		callID = strings.NewReplacer(":", "_").Replace(tool.Key)
 	}
 	responseTool := dto.ToolCallResponse{
 		ID:   callID,
