@@ -59,6 +59,18 @@ func ShouldDisableChannel(err *types.NewAPIError) bool {
 		return true
 	}
 
+	oaiErr := err.ToOpenAIError()
+	switch fmt.Sprintf("%v", oaiErr.Code) {
+	case "invalid_api_key", "account_deactivated", "billing_not_active",
+		"pre_consume_token_quota_failed", "Arrearage":
+		return true
+	}
+	switch oaiErr.Type {
+	case "insufficient_quota", "insufficient_user_quota",
+		"authentication_error", "permission_error", "forbidden":
+		return true
+	}
+
 	lowerMessage := strings.ToLower(err.Error())
 	search, _ := AcSearch(lowerMessage, operation_setting.AutomaticDisableKeywords, true)
 	return search
