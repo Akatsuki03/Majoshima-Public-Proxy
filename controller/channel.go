@@ -1096,7 +1096,7 @@ func UpdateChannelStatus(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	changed := model.UpdateChannelStatus(id, "", req.Status, "manual operation")
+	changed := model.UpdateChannelStatus(id, "", -1, req.Status, "manual operation")
 	if changed {
 		model.InitChannelCache()
 		service.ResetProxyClientCache()
@@ -1121,7 +1121,7 @@ func BatchUpdateChannelStatus(c *gin.Context) {
 	}
 	changedCount := 0
 	for _, id := range req.Ids {
-		if model.UpdateChannelStatus(id, "", req.Status, "manual batch operation") {
+		if model.UpdateChannelStatus(id, "", -1, req.Status, "manual batch operation") {
 			changedCount++
 		}
 	}
