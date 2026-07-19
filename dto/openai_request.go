@@ -206,6 +206,207 @@ func (r *GeneralOpenAIRequest) SetModelName(modelName string) {
 	}
 }
 
+// NormalizeAnthropicToolMessageBlocks rewrites Cursor/Anthropic-style tool
+// blocks that sometimes appear inside OpenAI Chat Completions payloads:
+//   - assistant content[].type=tool_use  → tool_calls
+//   - user content[].type=tool_result    → role=tool messages
+//
+// Leaving these blocks intact causes OpenRouter/OpenAI-compatible upstreams
+// to reject the request with "Invalid message format for role: user".
+func (r *GeneralOpenAIRequest) NormalizeAnthropicToolMessageBlocks() {
+	if r == nil || len(r.Messages) == 0 {
+		return
+	}
+	normalized := make([]Message, 0, len(r.Messages))
+	for _, message := range r.Messages {
+		normalized = append(normalized, normalizeAnthropicToolBlocksInMessage(message)...)
+	}
+	r.Messages = normalized
+}
+
+func normalizeAnthropicToolBlocksInMessage(message Message) []Message {
+	parts, ok := openAIMessageContentParts(message.Content)
+	if !ok {
+		return []Message{message}
+	}
+
+	hasToolUse := false
+	hasToolResult := false
+	for _, part := range parts {
+		switch strings.TrimSpace(common.Interface2String(part["type"])) {
+		case "tool_use":
+			hasToolUse = true
+		case "tool_result":
+			hasToolResult = true
+		}
+	}
+	if !hasToolUse && !hasToolResult {
+		return []Message{message}
+	}
+
+	out := make([]Message, 0, 2)
+	mediaParts := make([]MediaContent, 0, len(parts))
+	toolCalls := message.ParseToolCalls()
+	if toolCalls == nil {
+		toolCalls = make([]ToolCallRequest, 0)
+	}
+
+	for _, part := range parts {
+		switch strings.TrimSpace(common.Interface2String(part["type"])) {
+		case "tool_use":
+			toolCalls = append(toolCalls, ToolCallRequest{
+				ID:   strings.TrimSpace(common.Interface2String(part["id"])),
+				Type: "function",
+				Function: FunctionRequest{
+					Name:      strings.TrimSpace(common.Interface2String(part["name"])),
+					Arguments: anthropicToolInputToArguments(part["input"]),
+				},
+			})
+		case "tool_result":
+			toolMessage := Message{
+				Role: "tool",
+				ToolCallId: firstNonEmptyString(
+					common.Interface2String(part["tool_use_id"]),
+					common.Interface2String(part["tool_call_id"]),
+					common.Interface2String(part["id"]),
+				),
+			}
+			if name := strings.TrimSpace(common.Interface2String(part["name"])); name != "" {
+				toolMessage.Name = &name
+			}
+			toolMessage.SetStringContent(anthropicToolResultContentToString(part["content"]))
+			out = append(out, toolMessage)
+		case "text", "input_text", "output_text":
+			text := common.Interface2String(part["text"])
+			if text == "" {
+				continue
+			}
+			media := MediaContent{Type: ContentTypeText, Text: text}
+			if cacheControl, exists := part["cache_control"]; exists && cacheControl != nil {
+				if raw, err := common.Marshal(cacheControl); err == nil {
+					media.CacheControl = raw
+				}
+			}
+			mediaParts = append(mediaParts, media)
+		case ContentTypeImageURL:
+			mediaParts = append(mediaParts, MediaContent{
+				Type:     ContentTypeImageURL,
+				ImageUrl: part["image_url"],
+			})
+		default:
+			if raw, err := common.Marshal(part); err == nil {
+				var media MediaContent
+				if err := common.Unmarshal(raw, &media); err == nil && media.Type != "" {
+					mediaParts = append(mediaParts, media)
+				}
+			}
+		}
+	}
+
+	role := message.Role
+	if hasToolUse && role != "assistant" {
+		role = "assistant"
+	}
+	if len(mediaParts) > 0 || len(toolCalls) > 0 {
+		rewritten := Message{
+			Role:             role,
+			Name:             message.Name,
+			Prefix:           message.Prefix,
+			ReasoningContent: message.ReasoningContent,
+			Reasoning:        message.Reasoning,
+		}
+		if len(mediaParts) == 1 && mediaParts[0].Type == ContentTypeText && len(mediaParts[0].CacheControl) == 0 {
+			rewritten.SetStringContent(mediaParts[0].Text)
+		} else if len(mediaParts) > 0 {
+			rewritten.SetMediaContent(mediaParts)
+		} else {
+			rewritten.SetNullContent()
+		}
+		if len(toolCalls) > 0 {
+			rewritten.SetToolCalls(toolCalls)
+		}
+		out = append(out, rewritten)
+	} else if !hasToolResult {
+		out = append(out, message)
+	}
+	return out
+}
+
+func openAIMessageContentParts(content any) ([]map[string]any, bool) {
+	switch typed := content.(type) {
+	case []any:
+		parts := make([]map[string]any, 0, len(typed))
+		for _, item := range typed {
+			part, ok := item.(map[string]any)
+			if !ok {
+				return nil, false
+			}
+			parts = append(parts, part)
+		}
+		return parts, true
+	case []map[string]any:
+		return typed, true
+	default:
+		return nil, false
+	}
+}
+
+func anthropicToolInputToArguments(input any) string {
+	if input == nil {
+		return "{}"
+	}
+	if s, ok := input.(string); ok {
+		if strings.TrimSpace(s) == "" {
+			return "{}"
+		}
+		return s
+	}
+	encoded, err := common.Marshal(input)
+	if err != nil {
+		return "{}"
+	}
+	return string(encoded)
+}
+
+func anthropicToolResultContentToString(content any) string {
+	switch typed := content.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	case []any:
+		var texts []string
+		for _, item := range typed {
+			part, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if strings.TrimSpace(common.Interface2String(part["type"])) == "text" {
+				if text := common.Interface2String(part["text"]); text != "" {
+					texts = append(texts, text)
+				}
+			}
+		}
+		if len(texts) > 0 {
+			return strings.Join(texts, "\n")
+		}
+	}
+	encoded, err := common.Marshal(content)
+	if err != nil {
+		return common.Interface2String(content)
+	}
+	return string(encoded)
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
 func (r *GeneralOpenAIRequest) ToMap() map[string]any {
 	result := make(map[string]any)
 	data, _ := common.Marshal(r)

@@ -137,3 +137,51 @@ func TestToolCallRequestNormalizesCompatibleFunctionShapes(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeAnthropicToolMessageBlocks(t *testing.T) {
+	raw := []byte(`{
+		"model":"claude-test",
+		"messages":[
+			{"role":"user","content":"what is the weather?"},
+			{"role":"assistant","content":[
+				{"type":"text","text":"I will check."},
+				{"type":"tool_use","id":"toolu_1","name":"lookup","input":{"q":"x"}}
+			]},
+			{"role":"user","content":[
+				{"type":"tool_result","tool_use_id":"toolu_1","content":"{\"ok\":true}"},
+				{"type":"text","text":"thanks"}
+			]}
+		]
+	}`)
+
+	var req GeneralOpenAIRequest
+	require.NoError(t, common.Unmarshal(raw, &req))
+	req.NormalizeAnthropicToolMessageBlocks()
+
+	require.Len(t, req.Messages, 4)
+	assert.Equal(t, "user", req.Messages[0].Role)
+	assert.Equal(t, "what is the weather?", req.Messages[0].StringContent())
+
+	assert.Equal(t, "assistant", req.Messages[1].Role)
+	assert.Equal(t, "I will check.", req.Messages[1].StringContent())
+	toolCalls := req.Messages[1].ParseToolCalls()
+	require.Len(t, toolCalls, 1)
+	assert.Equal(t, "toolu_1", toolCalls[0].ID)
+	assert.Equal(t, "function", toolCalls[0].Type)
+	assert.Equal(t, "lookup", toolCalls[0].Function.Name)
+	assert.Equal(t, `{"q":"x"}`, toolCalls[0].Function.Arguments)
+
+	assert.Equal(t, "tool", req.Messages[2].Role)
+	assert.Equal(t, "toolu_1", req.Messages[2].ToolCallId)
+	assert.Equal(t, `{"ok":true}`, req.Messages[2].StringContent())
+
+	assert.Equal(t, "user", req.Messages[3].Role)
+	assert.Equal(t, "thanks", req.Messages[3].StringContent())
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+	assert.False(t, gjson.GetBytes(encoded, `messages.#(content.#(type=="tool_result"))`).Exists())
+	assert.False(t, gjson.GetBytes(encoded, `messages.#(content.#(type=="tool_use"))`).Exists())
+	assert.Equal(t, "tool", gjson.GetBytes(encoded, "messages.2.role").String())
+	assert.Equal(t, "lookup", gjson.GetBytes(encoded, "messages.1.tool_calls.0.function.name").String())
+}

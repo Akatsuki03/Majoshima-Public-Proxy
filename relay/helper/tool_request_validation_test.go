@@ -56,3 +56,28 @@ func TestGetAndValidateTextRequestRejectsEmptyFunctionToolName(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAndValidateTextRequestNormalizesAnthropicToolBlocks(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBufferString(`{
+		"model":"claude-test",
+		"messages":[
+			{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"lookup","input":{"q":"x"}}]},
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]}
+		]
+	}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+
+	require.NoError(t, err)
+	require.Len(t, req.Messages, 2)
+	assert.Equal(t, "assistant", req.Messages[0].Role)
+	toolCalls := req.Messages[0].ParseToolCalls()
+	require.Len(t, toolCalls, 1)
+	assert.Equal(t, "lookup", toolCalls[0].Function.Name)
+	assert.Equal(t, "tool", req.Messages[1].Role)
+	assert.Equal(t, "toolu_1", req.Messages[1].ToolCallId)
+	assert.Equal(t, "ok", req.Messages[1].StringContent())
+}
