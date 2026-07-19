@@ -243,6 +243,48 @@ type ToolCallRequest struct {
 	Custom   json.RawMessage `json:"custom,omitempty"`
 }
 
+func (t *ToolCallRequest) UnmarshalJSON(data []byte) error {
+	type toolCallRequestAlias ToolCallRequest
+
+	var canonical toolCallRequestAlias
+	if err := common.Unmarshal(data, &canonical); err != nil {
+		return err
+	}
+	*t = ToolCallRequest(canonical)
+
+	if t.Type != "" && t.Type != "function" {
+		return nil
+	}
+
+	var topLevelFunction struct {
+		Name        string `json:"name"`
+		Description string `json:"description,omitempty"`
+		Parameters  any    `json:"parameters,omitempty"`
+		InputSchema any    `json:"input_schema,omitempty"`
+	}
+	if err := common.Unmarshal(data, &topLevelFunction); err != nil {
+		return err
+	}
+
+	if t.Function.Name == "" {
+		t.Function.Name = topLevelFunction.Name
+	}
+	if t.Function.Description == "" {
+		t.Function.Description = topLevelFunction.Description
+	}
+	if t.Function.Parameters == nil {
+		if topLevelFunction.Parameters != nil {
+			t.Function.Parameters = topLevelFunction.Parameters
+		} else {
+			t.Function.Parameters = topLevelFunction.InputSchema
+		}
+	}
+	if t.Type == "" && (t.Function.Name != "" || t.Function.Description != "" || t.Function.Parameters != nil) {
+		t.Type = "function"
+	}
+	return nil
+}
+
 type FunctionRequest struct {
 	Description string `json:"description,omitempty"`
 	Name        string `json:"name"`

@@ -307,6 +307,11 @@ func GetAndValidateTextRequest(c *gin.Context, relayMode int) (*dto.GeneralOpenA
 	if textRequest.Model == "" {
 		return nil, errors.New("model is required")
 	}
+	for i, tool := range textRequest.Tools {
+		if (tool.Type == "" || tool.Type == "function") && strings.TrimSpace(tool.Function.Name) == "" {
+			return nil, fmt.Errorf("tools[%d].function.name is required", i)
+		}
+	}
 	if textRequest.WebSearchOptions != nil {
 		if textRequest.WebSearchOptions.SearchContextSize != "" {
 			validSizes := map[string]bool{

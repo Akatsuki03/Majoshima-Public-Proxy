@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
@@ -92,6 +93,47 @@ func TestGeneralOpenAIRequestGetSystemRoleName(t *testing.T) {
 			req := GeneralOpenAIRequest{Model: tt.model}
 
 			require.Equal(t, tt.want, req.GetSystemRoleName())
+		})
+	}
+}
+
+func TestToolCallRequestNormalizesCompatibleFunctionShapes(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{
+			name: "openai chat",
+			raw:  `{"type":"function","function":{"name":"lookup","description":"Lookup data","parameters":{"type":"object"}}}`,
+		},
+		{
+			name: "cursor anthropic style",
+			raw:  `{"name":"lookup","description":"Lookup data","input_schema":{"type":"object"}}`,
+		},
+		{
+			name: "responses flat style",
+			raw:  `{"type":"function","name":"lookup","description":"Lookup data","parameters":{"type":"object"}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var tool ToolCallRequest
+			require.NoError(t, common.Unmarshal([]byte(tt.raw), &tool))
+
+			assert.Equal(t, "function", tool.Type)
+			assert.Equal(t, "lookup", tool.Function.Name)
+			assert.Equal(t, "Lookup data", tool.Function.Description)
+			require.IsType(t, map[string]any{}, tool.Function.Parameters)
+			assert.Equal(t, "object", tool.Function.Parameters.(map[string]any)["type"])
+
+			encoded, err := common.Marshal(tool)
+			require.NoError(t, err)
+			assert.Equal(t, "function", gjson.GetBytes(encoded, "type").String())
+			assert.Equal(t, "lookup", gjson.GetBytes(encoded, "function.name").String())
+			assert.Equal(t, "object", gjson.GetBytes(encoded, "function.parameters.type").String())
+			assert.False(t, gjson.GetBytes(encoded, "name").Exists())
+			assert.False(t, gjson.GetBytes(encoded, "input_schema").Exists())
 		})
 	}
 }
