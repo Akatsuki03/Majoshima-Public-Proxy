@@ -329,6 +329,24 @@ func CloseTicket(ticketId, adminUserId int, closeReason, closeMessage string) er
 	})
 }
 
+// DeleteTicket permanently removes a closed ticket and its messages. Open tickets
+// must be closed first so an in-progress conversation cannot be dropped by mistake.
+func DeleteTicket(ticketId int) error {
+	ticket, err := GetTicketById(ticketId)
+	if err != nil {
+		return err
+	}
+	if ticket.Status != TicketStatusClosed {
+		return errors.New("only closed tickets can be deleted")
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("ticket_id = ?", ticketId).Delete(&TicketMessage{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&Ticket{}, ticketId).Error
+	})
+}
+
 // ZeroNegativeQuota clears a user's negative wallet quota once per cooldown period.
 func ZeroNegativeQuota(userId int) error {
 	setting := operation_setting.GetQuotaZeroSetting()

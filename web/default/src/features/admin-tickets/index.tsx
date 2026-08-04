@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils'
 
 import {
   closeAdminTicket,
+  deleteAdminTicket,
   getAdminTicket,
   getAdminTickets,
   replyAdminTicket,
@@ -79,6 +80,7 @@ export function AdminTicketsPage() {
   const [closeReason, setCloseReason] =
     useState<TicketCloseReason>('resolved')
   const [closeMessage, setCloseMessage] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const listQuery = useQuery({
     queryKey: ['admin-tickets', page, status, category, userIdFilter],
@@ -141,6 +143,25 @@ export function AdminTicketsPage() {
       setCloseOpen(false)
       setCloseMessage('')
       queryClient.invalidateQueries({ queryKey: ['admin-ticket', selectedId] })
+      queryClient.invalidateQueries({ queryKey: ['admin-tickets'] })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => {
+      if (selectedId == null) {
+        return Promise.reject(new Error('no ticket selected'))
+      }
+      return deleteAdminTicket(selectedId)
+    },
+    onSuccess: (res) => {
+      if (!res.success) {
+        toast.error(res.message || t('Failed to delete ticket'))
+        return
+      }
+      toast.success(t('Ticket deleted'))
+      setDeleteOpen(false)
+      setSelectedId(null)
       queryClient.invalidateQueries({ queryKey: ['admin-tickets'] })
     },
   })
@@ -260,6 +281,7 @@ export function AdminTicketsPage() {
                   onSend={() => replyMutation.mutate()}
                   sending={replyMutation.isPending}
                   onClose={() => setCloseOpen(true)}
+                  onDelete={() => setDeleteOpen(true)}
                 />
               )}
             </div>
@@ -327,6 +349,36 @@ export function AdminTicketsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('Delete Ticket')}</DialogTitle>
+          </DialogHeader>
+          <p className='text-muted-foreground text-sm'>
+            {t(
+              'This permanently deletes the ticket and all of its messages. This cannot be undone.'
+            )}
+          </p>
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setDeleteOpen(false)}
+            >
+              {t('Cancel')}
+            </Button>
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              {t('Delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -338,8 +390,10 @@ function AdminTicketDetail(props: {
   onSend: () => void
   sending: boolean
   onClose: () => void
+  onDelete: () => void
 }) {
   const { t } = useTranslation()
+  const isOpen = props.ticket.status === 'open'
   return (
     <div className='flex h-full flex-col gap-3'>
       <div className='flex items-start justify-between gap-2'>
@@ -350,11 +404,26 @@ function AdminTicketDetail(props: {
             · {categoryLabel(t, props.ticket.category)}
           </p>
         </div>
-        {props.ticket.status === 'open' && (
-          <Button variant='outline' size='sm' onClick={props.onClose}>
-            {t('Close Ticket')}
+        <div className='flex shrink-0 items-center gap-2'>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            disabled={!isOpen}
+            onClick={props.onClose}
+          >
+            {isOpen ? t('Close Ticket') : t('Closed')}
           </Button>
-        )}
+          <Button
+            type='button'
+            variant='destructive'
+            size='sm'
+            disabled={isOpen}
+            onClick={props.onDelete}
+          >
+            {t('Delete')}
+          </Button>
+        </div>
       </div>
       <div className='min-h-0 flex-1 space-y-3 overflow-y-auto'>
         {(props.ticket.messages ?? []).map((message) => (
@@ -384,6 +453,7 @@ function AdminTicketDetail(props: {
             rows={3}
           />
           <Button
+            type='button'
             disabled={!props.reply.trim() || props.sending}
             onClick={props.onSend}
           >

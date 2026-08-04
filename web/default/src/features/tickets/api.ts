@@ -100,3 +100,8 @@ export async function closeAdminTicket(
   const res = await api.post(`/api/ticket/${id}/close`, data)
   return res.data
 }
+
+export async function deleteAdminTicket(id: number): Promise<ApiResponse> {
+  const res = await api.delete(`/api/ticket/${id}`)
+  return res.data
+}

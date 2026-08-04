@@ -284,6 +284,7 @@ func SetApiRouter(router *gin.Engine) {
 			ticketAdminRoute.GET("/:id", controller.GetAdminTicket)
 			ticketAdminRoute.POST("/:id/reply", controller.ReplyAdminTicket)
 			ticketAdminRoute.POST("/:id/close", controller.CloseAdminTicket)
+			ticketAdminRoute.DELETE("/:id", controller.DeleteAdminTicket)
 		}
 
 		logRoute := apiRouter.Group("/log")

@@ -386,6 +386,9 @@ const AUDIT_TEMPLATES: Record<string, string> = {
   'subscription.bind': 'Bound a subscription',
   // Logs
   'log.clear': 'Cleared historical logs',
+  // Tickets
+  'ticket.close': 'Closed a ticket',
+  'ticket.delete': 'Deleted a ticket',
   // Generic middleware fallback
   generic: '{{method}} {{route}}',
 }

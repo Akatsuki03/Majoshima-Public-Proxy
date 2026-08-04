@@ -231,6 +231,22 @@ func CloseAdminTicket(c *gin.Context) {
 	})
 }
 
+func DeleteAdminTicket(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := model.DeleteTicket(id); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+}
+
 func ZeroSelfQuota(c *gin.Context) {
 	userId := c.GetInt("id")
 	if err := model.ZeroNegativeQuota(userId); err != nil {

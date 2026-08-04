@@ -152,3 +152,56 @@ func TestCloseTicketRequiresCustomMessage(t *testing.T) {
 	assert.Equal(t, TicketStatusClosed, reloaded.Status)
 	assert.Equal(t, TicketCloseReasonResolved, reloaded.CloseReason)
 }
+
+func TestDeleteTicketOnlyWhenClosed(t *testing.T) {
+	if DB == nil {
+		t.Skip("database not initialized")
+	}
+
+	ticketSetting := operation_setting.GetTicketSetting()
+	originalTicket := *ticketSetting
+	t.Cleanup(func() { *ticketSetting = originalTicket })
+	ticketSetting.Enabled = true
+	ticketSetting.DailyLimit = 10
+
+	username := "ticket_delete_" + common.GetRandomString(8)
+	user := &User{
+		Username:    username,
+		Password:    "password123",
+		DisplayName: username,
+		Role:        common.RoleCommonUser,
+		Status:      common.UserStatusEnabled,
+	}
+	require.NoError(t, user.Insert(0))
+	adminName := "ticket_del_admin_" + common.GetRandomString(8)
+	admin := &User{
+		Username:    adminName,
+		Password:    "password123",
+		DisplayName: adminName,
+		Role:        common.RoleAdminUser,
+		Status:      common.UserStatusEnabled,
+	}
+	require.NoError(t, admin.Insert(0))
+	t.Cleanup(func() {
+		_ = DB.Unscoped().Delete(&TicketMessage{}, "user_id in ?", []int{user.Id, admin.Id})
+		_ = DB.Unscoped().Delete(&Ticket{}, "user_id = ?", user.Id)
+		_ = DB.Unscoped().Delete(&User{}, "id in ?", []int{user.Id, admin.Id})
+	})
+
+	ticket, err := CreateTicket(user.Id, TicketCategoryOther, "delete me", "body")
+	require.NoError(t, err)
+
+	err = DeleteTicket(ticket.Id)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "only closed tickets")
+
+	require.NoError(t, CloseTicket(ticket.Id, admin.Id, TicketCloseReasonResolved, ""))
+	require.NoError(t, DeleteTicket(ticket.Id))
+
+	_, err = GetTicketById(ticket.Id)
+	require.Error(t, err)
+
+	messages, err := GetTicketMessages(ticket.Id)
+	require.NoError(t, err)
+	assert.Empty(t, messages)
+}

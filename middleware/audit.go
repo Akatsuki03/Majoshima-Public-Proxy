@@ -94,6 +94,10 @@ var auditRouteActions = map[string]string{
 
 	// 日志
 	"DELETE /api/log/": "log.clear",
+
+	// 工单
+	"POST /api/ticket/:id/close": "ticket.close",
+	"DELETE /api/ticket/:id":     "ticket.delete",
 }
 
 // beginAdminAudit 在管理/root 写操作进入 handler 前包装 ResponseWriter，
