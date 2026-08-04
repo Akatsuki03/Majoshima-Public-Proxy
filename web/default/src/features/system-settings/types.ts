@@ -368,6 +368,14 @@ export type OperationsSettings = {
   'test_penalty_setting.amount': number
   'test_penalty_setting.min_input_tokens': number
   'input_limit_setting.max_input_tokens': number
+  'ticket_setting.enabled': boolean
+  'ticket_setting.daily_limit': number
+  'quota_zero_setting.enabled': boolean
+  'quota_zero_setting.cooldown_days': number
+  'ua_blacklist_setting.enabled': boolean
+  'ua_blacklist_setting.patterns': string[]
+  'ua_blacklist_setting.exempt_user_groups': string[]
+  'ua_blacklist_setting.exempt_billing_groups': string[]
 }
 
 export type SecuritySettings = {

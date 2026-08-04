@@ -60,6 +60,14 @@ const defaultOperationsSettings: OperationsSettings = {
   'test_penalty_setting.amount': 1000,
   'test_penalty_setting.min_input_tokens': 0,
   'input_limit_setting.max_input_tokens': 0,
+  'ticket_setting.enabled': true,
+  'ticket_setting.daily_limit': 1,
+  'quota_zero_setting.enabled': true,
+  'quota_zero_setting.cooldown_days': 7,
+  'ua_blacklist_setting.enabled': true,
+  'ua_blacklist_setting.patterns': ['claude-cli', 'codex-cli'],
+  'ua_blacklist_setting.exempt_user_groups': [],
+  'ua_blacklist_setting.exempt_billing_groups': [],
 }
 
 export function OperationsSettings() {

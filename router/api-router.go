@@ -119,6 +119,10 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/checkin", controller.GetCheckinStatus)
 				selfRoute.POST("/checkin", middleware.TurnstileCheck(), controller.DoCheckin)
 
+				// Negative quota zero
+				selfRoute.GET("/quota_zero", controller.GetQuotaZeroStatus)
+				selfRoute.POST("/quota_zero", middleware.CriticalRateLimit(), controller.ZeroSelfQuota)
+
 				// Custom OAuth bindings
 				selfRoute.GET("/oauth/bindings", controller.GetUserOAuthBindings)
 				selfRoute.DELETE("/oauth/bindings/:provider_id", controller.UnbindCustomOAuth)
@@ -264,6 +268,24 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
 		}
+
+		ticketSelfRoute := apiRouter.Group("/ticket")
+		ticketSelfRoute.Use(middleware.UserAuth())
+		{
+			ticketSelfRoute.GET("/self", controller.GetSelfTickets)
+			ticketSelfRoute.POST("/self", middleware.CriticalRateLimit(), controller.CreateSelfTicket)
+			ticketSelfRoute.GET("/self/:id", controller.GetSelfTicket)
+			ticketSelfRoute.POST("/self/:id/reply", middleware.CriticalRateLimit(), controller.ReplySelfTicket)
+		}
+		ticketAdminRoute := apiRouter.Group("/ticket")
+		ticketAdminRoute.Use(middleware.AdminAuth())
+		{
+			ticketAdminRoute.GET("/", controller.GetAdminTickets)
+			ticketAdminRoute.GET("/:id", controller.GetAdminTicket)
+			ticketAdminRoute.POST("/:id/reply", controller.ReplyAdminTicket)
+			ticketAdminRoute.POST("/:id/close", controller.CloseAdminTicket)
+		}
+
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)
 		// Legacy synchronous direct-delete route used only by the classic frontend.

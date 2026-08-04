@@ -51,6 +51,9 @@ type User struct {
 	Remark           string                     `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string                     `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 	LastUserAgent    string                     `json:"last_user_agent,omitempty" gorm:"type:varchar(512);column:last_user_agent;default:''"`
+	TicketDisabled   bool                       `json:"ticket_disabled"`
+	LastQuotaZeroTime int64                     `json:"last_quota_zero_time" gorm:"column:last_quota_zero_time;default:0"`
+	BanReason        string                     `json:"ban_reason,omitempty" gorm:"type:varchar(255);column:ban_reason;default:''"`
 	CreatedAt        int64                      `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt      int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 	AdminPermissions map[string]map[string]bool `json:"admin_permissions,omitempty" gorm:"-:all"`
@@ -689,10 +692,12 @@ func (user *User) EditWithTx(tx *gorm.DB, updatePassword bool) error {
 
 	newUser := *user
 	updates := map[string]interface{}{
-		"username":     newUser.Username,
-		"display_name": newUser.DisplayName,
-		"group":        newUser.Group,
-		"remark":       newUser.Remark,
+		"username":         newUser.Username,
+		"display_name":     newUser.DisplayName,
+		"group":            newUser.Group,
+		"remark":           newUser.Remark,
+		"ticket_disabled":  newUser.TicketDisabled,
+		"ban_reason":       newUser.BanReason,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password

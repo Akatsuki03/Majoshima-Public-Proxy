@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { SystemBehaviorSection } from '../general/system-behavior-section'
 import { RequestGuardSection } from './request-guard-section'
+import { TicketQuotaSection } from './ticket-quota-section'
+import { UABlacklistSection } from './ua-blacklist-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
 import { WorkerSettingsSection } from '../integrations/worker-settings-section'
@@ -52,6 +54,40 @@ const OPERATIONS_SECTIONS = [
           penaltyMinInputTokens:
             settings['test_penalty_setting.min_input_tokens'],
           maxInputTokens: settings['input_limit_setting.max_input_tokens'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'tickets-quota',
+    titleKey: 'Tickets & Quota Zero',
+    build: (settings: OperationsSettings) => (
+      <TicketQuotaSection
+        defaultValues={{
+          ticketEnabled: settings['ticket_setting.enabled'] ?? true,
+          ticketDailyLimit: settings['ticket_setting.daily_limit'] ?? 1,
+          quotaZeroEnabled: settings['quota_zero_setting.enabled'] ?? true,
+          quotaZeroCooldownDays:
+            settings['quota_zero_setting.cooldown_days'] ?? 7,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'ua-blacklist',
+    titleKey: 'UA Blacklist',
+    build: (settings: OperationsSettings) => (
+      <UABlacklistSection
+        defaultValues={{
+          enabled: settings['ua_blacklist_setting.enabled'] ?? true,
+          patterns: settings['ua_blacklist_setting.patterns'] ?? [
+            'claude-cli',
+            'codex-cli',
+          ],
+          exemptUserGroups:
+            settings['ua_blacklist_setting.exempt_user_groups'] ?? [],
+          exemptBillingGroups:
+            settings['ua_blacklist_setting.exempt_billing_groups'] ?? [],
         }}
       />
     ),

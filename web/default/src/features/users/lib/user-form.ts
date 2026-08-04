@@ -27,7 +27,7 @@ import { quotaUnitsToDollars } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 
 import { DEFAULT_GROUP } from '../constants'
-import { type UserFormData, type User } from '../types'
+import type { UserFormData, User } from '../types'
 
 // ============================================================================
 // Form Schema
@@ -41,6 +41,8 @@ export const userFormSchema = z.object({
   quota_dollars: z.number().min(0).optional(),
   group: z.string().optional(),
   remark: z.string().optional(),
+  ticket_disabled: z.boolean().optional(),
+  ban_reason: z.string().optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
     .optional(),
@@ -60,6 +62,8 @@ export const USER_FORM_DEFAULT_VALUES: UserFormValues = {
   quota_dollars: 0,
   group: DEFAULT_GROUP,
   remark: '',
+  ticket_disabled: false,
+  ban_reason: '',
   // Filled against the backend catalog at render time; see UsersMutateDrawer.
   admin_permissions: {},
 }
@@ -101,6 +105,8 @@ export function transformFormDataToPayload(
     // For update: quota is adjusted atomically via /api/user/manage, not sent here
     payload.group = data.group
     payload.remark = data.remark || undefined
+    payload.ticket_disabled = data.ticket_disabled === true
+    payload.ban_reason = data.ban_reason || ''
     payload.id = userId
   }
 
@@ -121,6 +127,8 @@ export function transformUserToFormDefaults(user: User): UserFormValues {
     quota_dollars: quotaUnitsToDollars(user.quota),
     group: user.group || DEFAULT_GROUP,
     remark: user.remark || '',
+    ticket_disabled: user.ticket_disabled === true,
+    ban_reason: user.ban_reason || '',
     admin_permissions: user.admin_permissions ?? {},
   }
 }

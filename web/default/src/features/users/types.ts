@@ -60,6 +60,9 @@ export const userSchema = z.object({
   last_user_agent: z.string().optional(),
   DeletedAt: z.any().nullable().optional(),
   remark: z.string().optional(),
+  ticket_disabled: z.boolean().optional(),
+  ban_reason: z.string().optional(),
+  last_quota_zero_time: z.number().optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
     .optional(),
@@ -112,6 +115,8 @@ export interface UserFormData {
   quota?: number // Only used when updating user
   group?: string // Only used when updating user
   remark?: string // Only used when updating user
+  ticket_disabled?: boolean
+  ban_reason?: string
   admin_permissions?: AdminPermissionMatrix
 }
 

@@ -447,6 +447,56 @@ export function UsersMutateDrawer({
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name='ticket_disabled'
+                    render={({ field }) => (
+                      <FormItem className='flex flex-row items-center justify-between rounded-lg border p-3'>
+                        <div className='space-y-0.5'>
+                          <FormLabel>{t('Disable ticket access')}</FormLabel>
+                          <FormDescription>
+                            {t(
+                              'Prevent this user from creating or replying to tickets.'
+                            )}
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === true}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked === true)
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='ban_reason'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Ban reason')}</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder={t(
+                              'System ban reason (e.g. UA blacklist)'
+                            )}
+                            rows={2}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Filled automatically when the account is disabled by UA blacklist.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </SideDrawerSection>
               )}
 
