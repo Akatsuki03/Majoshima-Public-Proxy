@@ -61,6 +61,11 @@ export async function replySelfTicket(
   return res.data
 }
 
+export async function deleteSelfTicket(id: number): Promise<ApiResponse> {
+  const res = await api.delete(`/api/ticket/self/${id}`)
+  return res.data
+}
+
 export async function getAdminTickets(params: {
   p?: number
   page_size?: number

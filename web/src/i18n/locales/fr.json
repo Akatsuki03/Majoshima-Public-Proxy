@@ -4653,6 +4653,7 @@
     "This plan does not allow balance redemption": "Ce forfait ne permet pas le paiement avec le solde",
     "This project must be used in compliance with the": "Ce projet doit être utilisé conformément aux",
     "This removes {{count}} failed models from this channel. This action cannot be undone.": "Cela supprime {{count}} modèles en échec de ce canal. Cette action est irréversible.",
+    "This removes the ticket from your list. It still counts toward your daily ticket limit.": "Le ticket sera retiré de votre liste, mais restera compté dans votre limite quotidienne.",
     "This route discovers upstream OpenAI models and cannot be split or matched by client model rules.": "Cette route découvre les modèles OpenAI en amont et ne peut être ni divisée ni associée par des règles de modèles clients.",
     "This session will lose access immediately and must sign in again.": "Cette session perdra immédiatement l’accès ; vous devrez vous reconnecter.",
     "This site currently has {{count}} models enabled": "Ce site compte actuellement {{count}} modèles activés",

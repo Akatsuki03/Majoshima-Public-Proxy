@@ -4653,6 +4653,7 @@
     "This plan does not allow balance redemption": "このプランでは残高での交換は許可されていません",
     "This project must be used in compliance with the": "このプロジェクトは、以下を遵守して使用する必要があります",
     "This removes {{count}} failed models from this channel. This action cannot be undone.": "この操作はこのチャンネルから失敗した {{count}} 個のモデルを削除します。元に戻せません。",
+    "This removes the ticket from your list. It still counts toward your daily ticket limit.": "このチケットは一覧から削除されますが、1日あたりのチケット上限には引き続き含まれます。",
     "This route discovers upstream OpenAI models and cannot be split or matched by client model rules.": "このルートはアップストリームの OpenAI モデルを検出するためのもので、分割やクライアントモデルルールによる照合はできません。",
     "This session will lose access immediately and must sign in again.": "このセッションは直ちにアクセスできなくなり、再度サインインが必要になります。",
     "This site currently has {{count}} models enabled": "このサイトでは現在 {{count}} 個のモデルが有効です",

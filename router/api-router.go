@@ -281,6 +281,7 @@ func SetApiRouter(router *gin.Engine) {
 			ticketSelfRoute.POST("/self", middleware.CriticalRateLimit(), controller.CreateSelfTicket)
 			ticketSelfRoute.GET("/self/:id", controller.GetSelfTicket)
 			ticketSelfRoute.POST("/self/:id/reply", middleware.CriticalRateLimit(), controller.ReplySelfTicket)
+			ticketSelfRoute.DELETE("/self/:id", controller.DeleteSelfTicket)
 		}
 		ticketAdminRoute := apiRouter.Group("/ticket")
 		ticketAdminRoute.Use(middleware.AdminAuth())

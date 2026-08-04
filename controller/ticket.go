@@ -86,7 +86,7 @@ func GetSelfTicket(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if ticket.UserId != userId {
+	if ticket.UserId != userId || ticket.UserHidden {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "ticket not found"})
 		return
 	}
@@ -124,6 +124,23 @@ func ReplySelfTicket(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    message,
+	})
+}
+
+func DeleteSelfTicket(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	userId := c.GetInt("id")
+	if err := model.HideTicketForUser(id, userId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
 	})
 }
 

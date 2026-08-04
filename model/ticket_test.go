@@ -205,3 +205,76 @@ func TestDeleteTicketOnlyWhenClosed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, messages)
 }
+
+func TestHideTicketForUserKeepsDailyLimit(t *testing.T) {
+	if DB == nil {
+		t.Skip("database not initialized")
+	}
+
+	ticketSetting := operation_setting.GetTicketSetting()
+	originalTicket := *ticketSetting
+	t.Cleanup(func() { *ticketSetting = originalTicket })
+	ticketSetting.Enabled = true
+	ticketSetting.DailyLimit = 1
+
+	username := "ticket_hide_" + common.GetRandomString(8)
+	user := &User{
+		Username:    username,
+		Password:    "password123",
+		DisplayName: username,
+		Role:        common.RoleCommonUser,
+		Status:      common.UserStatusEnabled,
+	}
+	require.NoError(t, user.Insert(0))
+	adminName := "ticket_hide_admin_" + common.GetRandomString(8)
+	admin := &User{
+		Username:    adminName,
+		Password:    "password123",
+		DisplayName: adminName,
+		Role:        common.RoleAdminUser,
+		Status:      common.UserStatusEnabled,
+	}
+	require.NoError(t, admin.Insert(0))
+	t.Cleanup(func() {
+		_ = DB.Unscoped().Delete(&TicketMessage{}, "user_id in ?", []int{user.Id, admin.Id})
+		_ = DB.Unscoped().Delete(&Ticket{}, "user_id = ?", user.Id)
+		_ = DB.Unscoped().Delete(&User{}, "id in ?", []int{user.Id, admin.Id})
+	})
+
+	ticket, err := CreateTicket(user.Id, TicketCategoryOther, "hide me", "body")
+	require.NoError(t, err)
+
+	// An open ticket cannot be removed from the user's list.
+	require.Error(t, HideTicketForUser(ticket.Id, user.Id))
+
+	require.NoError(t, CloseTicket(ticket.Id, admin.Id, TicketCloseReasonResolved, ""))
+
+	// A ticket belonging to somebody else is not visible to this user.
+	require.Error(t, HideTicketForUser(ticket.Id, admin.Id))
+
+	require.NoError(t, HideTicketForUser(ticket.Id, user.Id))
+
+	// Hidden for the owner...
+	tickets, total, err := GetUserTickets(user.Id, 1, 20)
+	require.NoError(t, err)
+	assert.Zero(t, total)
+	assert.Empty(t, tickets)
+
+	// ...but still counted against the daily limit, so hiding cannot be used to
+	// create more tickets than allowed.
+	_, err = CreateTicket(user.Id, TicketCategoryOther, "second", "body")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "daily ticket limit")
+
+	// ...and still visible to admins.
+	adminTickets, adminTotal, err := GetAdminTickets(AdminTicketQuery{UserId: user.Id})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), adminTotal)
+	require.Len(t, adminTickets, 1)
+	assert.Equal(t, ticket.Id, adminTickets[0].Id)
+
+	// Hiding twice is rejected, and the user can no longer reply to it.
+	require.Error(t, HideTicketForUser(ticket.Id, user.Id))
+	_, err = ReplyTicket(ticket.Id, user.Id, false, "still there?")
+	require.Error(t, err)
+}

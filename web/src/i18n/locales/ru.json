@@ -4653,6 +4653,7 @@
     "This plan does not allow balance redemption": "Этот план не разрешает оплату балансом",
     "This project must be used in compliance with the": "Этот проект должен использоваться в соответствии с",
     "This removes {{count}} failed models from this channel. This action cannot be undone.": "Это удалит {{count}} неуспешных моделей из этого канала. Действие необратимо.",
+    "This removes the ticket from your list. It still counts toward your daily ticket limit.": "Обращение будет удалено из вашего списка, но продолжит учитываться в дневном лимите.",
     "This route discovers upstream OpenAI models and cannot be split or matched by client model rules.": "Этот маршрут обнаруживает модели OpenAI вышестоящего сервиса; его нельзя разделять или сопоставлять по правилам клиентских моделей.",
     "This session will lose access immediately and must sign in again.": "Этот сеанс немедленно потеряет доступ, и потребуется повторный вход.",
     "This site currently has {{count}} models enabled": "На этом сайте сейчас включено моделей: {{count}}",

@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils'
 
 import {
   createSelfTicket,
+  deleteSelfTicket,
   getSelfTicket,
   getSelfTickets,
   replySelfTicket,
@@ -77,6 +78,7 @@ export function TicketsPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [reply, setReply] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const listQuery = useQuery({
     queryKey: ['self-tickets', page],
@@ -129,6 +131,26 @@ export function TicketsPage() {
       queryClient.invalidateQueries({ queryKey: ['self-tickets'] })
     },
     onError: () => toast.error(t('Failed to send reply')),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => {
+      if (selectedId == null) {
+        return Promise.reject(new Error('no ticket selected'))
+      }
+      return deleteSelfTicket(selectedId)
+    },
+    onSuccess: (res) => {
+      if (!res.success) {
+        toast.error(res.message || t('Failed to delete ticket'))
+        return
+      }
+      toast.success(t('Ticket deleted'))
+      setDeleteOpen(false)
+      setSelectedId(null)
+      queryClient.invalidateQueries({ queryKey: ['self-tickets'] })
+    },
+    onError: () => toast.error(t('Failed to delete ticket')),
   })
 
   const listData = listQuery.data?.data
@@ -236,6 +258,7 @@ export function TicketsPage() {
                   canReply={
                     selected.status === 'open' && !ticketDisabled && enabled
                   }
+                  onDelete={() => setDeleteOpen(true)}
                 />
               )}
             </div>
@@ -308,6 +331,36 @@ export function TicketsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('Delete Ticket')}</DialogTitle>
+          </DialogHeader>
+          <p className='text-muted-foreground text-sm'>
+            {t(
+              'This removes the ticket from your list. It still counts toward your daily ticket limit.'
+            )}
+          </p>
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setDeleteOpen(false)}
+            >
+              {t('Cancel')}
+            </Button>
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              {t('Delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -319,20 +372,33 @@ function TicketDetailPanel(props: {
   onSend: () => void
   sending: boolean
   canReply: boolean
+  onDelete: () => void
 }) {
   const { t } = useTranslation()
+  const isClosed = props.ticket.status === 'closed'
   return (
     <div className='flex h-full flex-col gap-3'>
       <div>
         <div className='flex items-center justify-between gap-2'>
           <h3 className='font-semibold'>{props.ticket.title}</h3>
-          <Badge
-            variant={
-              props.ticket.status === 'open' ? 'default' : 'secondary'
-            }
-          >
-            {props.ticket.status === 'open' ? t('Open') : t('Closed')}
-          </Badge>
+          <div className='flex shrink-0 items-center gap-2'>
+            <Badge
+              variant={
+                props.ticket.status === 'open' ? 'default' : 'secondary'
+              }
+            >
+              {props.ticket.status === 'open' ? t('Open') : t('Closed')}
+            </Badge>
+            <Button
+              type='button'
+              variant='destructive'
+              size='sm'
+              disabled={!isClosed}
+              onClick={props.onDelete}
+            >
+              {t('Delete')}
+            </Button>
+          </div>
         </div>
         <p className='text-muted-foreground mt-1 text-xs'>
           {categoryLabel(t, props.ticket.category)} · #{props.ticket.id}
@@ -367,6 +433,7 @@ function TicketDetailPanel(props: {
             rows={3}
           />
           <Button
+            type='button'
             disabled={!props.reply.trim() || props.sending}
             onClick={props.onSend}
           >

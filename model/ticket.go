@@ -50,6 +50,9 @@ type Ticket struct {
 	CreatedAt   int64  `json:"created_at" gorm:"bigint;autoCreateTime"`
 	UpdatedAt   int64  `json:"updated_at" gorm:"bigint;autoUpdateTime"`
 	ClosedAt    int64  `json:"closed_at" gorm:"bigint;default:0"`
+	// UserHidden removes the ticket from the owner's list without deleting the
+	// row, so the daily creation limit still counts it and admins keep the record.
+	UserHidden bool `json:"user_hidden" gorm:"index"`
 
 	Username string          `json:"username,omitempty" gorm:"-"`
 	Messages []TicketMessage `json:"messages,omitempty" gorm:"-"`
@@ -183,7 +186,7 @@ func GetUserTickets(userId int, page, pageSize int) ([]*Ticket, int64, error) {
 		pageSize = 20
 	}
 	var total int64
-	query := DB.Model(&Ticket{}).Where("user_id = ?", userId)
+	query := DB.Model(&Ticket{}).Where("user_id = ? AND user_hidden = ?", userId, false)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -246,7 +249,7 @@ func ReplyTicket(ticketId, userId int, isAdmin bool, content string) (*TicketMes
 		return nil, errors.New("ticket is closed")
 	}
 	if !isAdmin {
-		if ticket.UserId != userId {
+		if ticket.UserId != userId || ticket.UserHidden {
 			return nil, errors.New("ticket not found")
 		}
 		user, err := GetUserById(userId, false)
@@ -327,6 +330,24 @@ func CloseTicket(ticketId, adminUserId int, closeReason, closeMessage string) er
 			"updated_at":   now,
 		}).Error
 	})
+}
+
+// HideTicketForUser removes a ticket from its owner's list without deleting the
+// row. The row must stay so CountUserTicketsCreatedToday keeps counting it,
+// otherwise a user could delete a ticket to bypass the daily creation limit.
+// Admins continue to see the ticket.
+func HideTicketForUser(ticketId, userId int) error {
+	ticket, err := GetTicketById(ticketId)
+	if err != nil {
+		return err
+	}
+	if ticket.UserId != userId || ticket.UserHidden {
+		return errors.New("ticket not found")
+	}
+	if ticket.Status != TicketStatusClosed {
+		return errors.New("only closed tickets can be deleted")
+	}
+	return DB.Model(&Ticket{}).Where("id = ?", ticketId).Update("user_hidden", true).Error
 }
 
 // DeleteTicket permanently removes a closed ticket and its messages. Open tickets
