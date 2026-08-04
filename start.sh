@@ -18,5 +18,5 @@ BACKEND_PID=$!
 
 echo "Backend started (PID: $BACKEND_PID) on port 3000"
 
-# Start rsbuild dev server (new default frontend) in foreground on port 5000
-cd web/default && bun run dev
+# Start rsbuild dev server (frontend) in foreground on port 5000
+cd web && bun run dev

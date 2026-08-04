@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 )
 
 func isEmptyRawJson(raw []byte) bool {
