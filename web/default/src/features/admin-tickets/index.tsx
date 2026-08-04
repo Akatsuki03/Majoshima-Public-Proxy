@@ -150,120 +150,122 @@ export function AdminTicketsPage() {
   const selected = detailQuery.data?.data
 
   return (
-    <SectionPageLayout fixedContent>
-      <SectionPageLayout.Title>{t('Tickets')}</SectionPageLayout.Title>
-      <SectionPageLayout.Content>
-        <div className='mb-4 flex flex-wrap gap-2'>
-          <Select
-            value={status}
-            onValueChange={(value) => {
-              if (value) setStatus(value)
-            }}
-          >
-            <SelectTrigger className='w-[140px]'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>{t('All statuses')}</SelectItem>
-              <SelectItem value='open'>{t('Open')}</SelectItem>
-              <SelectItem value='closed'>{t('Closed')}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={category}
-            onValueChange={(value) => {
-              if (value) setCategory(value)
-            }}
-          >
-            <SelectTrigger className='w-[180px]'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>{t('All categories')}</SelectItem>
-              {TICKET_CATEGORIES.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {t(item.labelKey)}
-                </SelectItem>
+    <>
+      <SectionPageLayout fixedContent>
+        <SectionPageLayout.Title>{t('Tickets')}</SectionPageLayout.Title>
+        <SectionPageLayout.Content>
+          <div className='mb-4 flex flex-wrap gap-2'>
+            <Select
+              value={status}
+              onValueChange={(value) => {
+                if (value) setStatus(value)
+              }}
+            >
+              <SelectTrigger className='w-[140px]'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>{t('All statuses')}</SelectItem>
+                <SelectItem value='open'>{t('Open')}</SelectItem>
+                <SelectItem value='closed'>{t('Closed')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={category}
+              onValueChange={(value) => {
+                if (value) setCategory(value)
+              }}
+            >
+              <SelectTrigger className='w-[180px]'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>{t('All categories')}</SelectItem>
+                {TICKET_CATEGORIES.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {t(item.labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              className='w-[140px]'
+              placeholder={t('User ID')}
+              value={userIdFilter}
+              onChange={(e) => setUserIdFilter(e.target.value)}
+            />
+          </div>
+
+          <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]'>
+            <div className='space-y-2'>
+              {tickets.map((ticket) => (
+                <button
+                  key={ticket.id}
+                  type='button'
+                  onClick={() => setSelectedId(ticket.id)}
+                  className={cn(
+                    'hover:bg-muted/50 w-full rounded-lg border p-3 text-left transition-colors',
+                    selectedId === ticket.id && 'border-primary bg-muted/40'
+                  )}
+                >
+                  <div className='flex items-center justify-between gap-2'>
+                    <span className='truncate font-medium'>{ticket.title}</span>
+                    <Badge
+                      variant={
+                        ticket.status === 'open' ? 'default' : 'secondary'
+                      }
+                    >
+                      {ticket.status === 'open' ? t('Open') : t('Closed')}
+                    </Badge>
+                  </div>
+                  <div className='text-muted-foreground mt-1 text-xs'>
+                    #{ticket.id} · {ticket.username || ticket.user_id} ·{' '}
+                    {categoryLabel(t, ticket.category)} ·{' '}
+                    {formatTime(ticket.created_at)}
+                  </div>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-          <Input
-            className='w-[140px]'
-            placeholder={t('User ID')}
-            value={userIdFilter}
-            onChange={(e) => setUserIdFilter(e.target.value)}
-          />
-        </div>
-
-        <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]'>
-          <div className='space-y-2'>
-            {tickets.map((ticket) => (
-              <button
-                key={ticket.id}
-                type='button'
-                onClick={() => setSelectedId(ticket.id)}
-                className={cn(
-                  'hover:bg-muted/50 w-full rounded-lg border p-3 text-left transition-colors',
-                  selectedId === ticket.id && 'border-primary bg-muted/40'
-                )}
-              >
-                <div className='flex items-center justify-between gap-2'>
-                  <span className='truncate font-medium'>{ticket.title}</span>
-                  <Badge
-                    variant={
-                      ticket.status === 'open' ? 'default' : 'secondary'
-                    }
+              {total > 20 && (
+                <div className='flex items-center justify-between pt-2'>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
-                    {ticket.status === 'open' ? t('Open') : t('Closed')}
-                  </Badge>
+                    {t('Previous')}
+                  </Button>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    disabled={page * 20 >= total}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    {t('Next')}
+                  </Button>
                 </div>
-                <div className='text-muted-foreground mt-1 text-xs'>
-                  #{ticket.id} · {ticket.username || ticket.user_id} ·{' '}
-                  {categoryLabel(t, ticket.category)} ·{' '}
-                  {formatTime(ticket.created_at)}
-                </div>
-              </button>
-            ))}
-            {total > 20 && (
-              <div className='flex items-center justify-between pt-2'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  {t('Previous')}
-                </Button>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={page * 20 >= total}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  {t('Next')}
-                </Button>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className='rounded-lg border p-4'>
-            {!selected ? (
-              <p className='text-muted-foreground text-sm'>
-                {t('Select a ticket to view details.')}
-              </p>
-            ) : (
-              <AdminTicketDetail
-                ticket={selected}
-                reply={reply}
-                onReplyChange={setReply}
-                onSend={() => replyMutation.mutate()}
-                sending={replyMutation.isPending}
-                onClose={() => setCloseOpen(true)}
-              />
-            )}
+            <div className='rounded-lg border p-4'>
+              {!selected ? (
+                <p className='text-muted-foreground text-sm'>
+                  {t('Select a ticket to view details.')}
+                </p>
+              ) : (
+                <AdminTicketDetail
+                  ticket={selected}
+                  reply={reply}
+                  onReplyChange={setReply}
+                  onSend={() => replyMutation.mutate()}
+                  sending={replyMutation.isPending}
+                  onClose={() => setCloseOpen(true)}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      </SectionPageLayout.Content>
+        </SectionPageLayout.Content>
+      </SectionPageLayout>
 
       <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
         <DialogContent>
@@ -305,10 +307,15 @@ export function AdminTicketsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant='outline' onClick={() => setCloseOpen(false)}>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setCloseOpen(false)}
+            >
               {t('Cancel')}
             </Button>
             <Button
+              type='button'
               disabled={
                 closeMutation.isPending ||
                 (closeReason === 'custom' && !closeMessage.trim())
@@ -320,7 +327,7 @@ export function AdminTicketsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SectionPageLayout>
+    </>
   )
 }
 

@@ -139,106 +139,109 @@ export function TicketsPage() {
   const selected = detailQuery.data?.data
 
   return (
-    <SectionPageLayout fixedContent>
-      <SectionPageLayout.Title>{t('Tickets')}</SectionPageLayout.Title>
-      <SectionPageLayout.Actions>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          disabled={ticketDisabled || !enabled}
-        >
-          {t('New Ticket')}
-        </Button>
-      </SectionPageLayout.Actions>
-      <SectionPageLayout.Content>
-        {!enabled && (
-          <p className='text-muted-foreground mb-4 text-sm'>
-            {t('Ticket feature is currently disabled.')}
-          </p>
-        )}
-        {ticketDisabled && (
-          <p className='text-destructive mb-4 text-sm'>
-            {t('Your ticket access has been disabled by an administrator.')}
-          </p>
-        )}
+    <>
+      <SectionPageLayout fixedContent>
+        <SectionPageLayout.Title>{t('Tickets')}</SectionPageLayout.Title>
+        <SectionPageLayout.Actions>
+          <Button
+            type='button'
+            onClick={() => setCreateOpen(true)}
+            disabled={ticketDisabled || !enabled}
+          >
+            {t('New Ticket')}
+          </Button>
+        </SectionPageLayout.Actions>
+        <SectionPageLayout.Content>
+          {!enabled && (
+            <p className='text-muted-foreground mb-4 text-sm'>
+              {t('Ticket feature is currently disabled.')}
+            </p>
+          )}
+          {ticketDisabled && (
+            <p className='text-destructive mb-4 text-sm'>
+              {t('Your ticket access has been disabled by an administrator.')}
+            </p>
+          )}
 
-        <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]'>
-          <div className='space-y-2'>
-            {tickets.length === 0 && !listQuery.isLoading && (
-              <p className='text-muted-foreground text-sm'>
-                {t('No tickets yet.')}
-              </p>
-            )}
-            {tickets.map((ticket) => (
-              <button
-                key={ticket.id}
-                type='button'
-                onClick={() => setSelectedId(ticket.id)}
-                className={cn(
-                  'hover:bg-muted/50 w-full rounded-lg border p-3 text-left transition-colors',
-                  selectedId === ticket.id && 'border-primary bg-muted/40'
-                )}
-              >
-                <div className='flex items-center justify-between gap-2'>
-                  <span className='truncate font-medium'>{ticket.title}</span>
-                  <Badge
-                    variant={
-                      ticket.status === 'open' ? 'default' : 'secondary'
-                    }
+          <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]'>
+            <div className='space-y-2'>
+              {tickets.length === 0 && !listQuery.isLoading && (
+                <p className='text-muted-foreground text-sm'>
+                  {t('No tickets yet.')}
+                </p>
+              )}
+              {tickets.map((ticket) => (
+                <button
+                  key={ticket.id}
+                  type='button'
+                  onClick={() => setSelectedId(ticket.id)}
+                  className={cn(
+                    'hover:bg-muted/50 w-full rounded-lg border p-3 text-left transition-colors',
+                    selectedId === ticket.id && 'border-primary bg-muted/40'
+                  )}
+                >
+                  <div className='flex items-center justify-between gap-2'>
+                    <span className='truncate font-medium'>{ticket.title}</span>
+                    <Badge
+                      variant={
+                        ticket.status === 'open' ? 'default' : 'secondary'
+                      }
+                    >
+                      {ticket.status === 'open' ? t('Open') : t('Closed')}
+                    </Badge>
+                  </div>
+                  <div className='text-muted-foreground mt-1 text-xs'>
+                    {categoryLabel(t, ticket.category)} ·{' '}
+                    {formatTime(ticket.created_at)}
+                  </div>
+                </button>
+              ))}
+              {total > 20 && (
+                <div className='flex items-center justify-between pt-2'>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
-                    {ticket.status === 'open' ? t('Open') : t('Closed')}
-                  </Badge>
+                    {t('Previous')}
+                  </Button>
+                  <span className='text-muted-foreground text-xs'>
+                    {page}
+                  </span>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    disabled={page * 20 >= total}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    {t('Next')}
+                  </Button>
                 </div>
-                <div className='text-muted-foreground mt-1 text-xs'>
-                  {categoryLabel(t, ticket.category)} ·{' '}
-                  {formatTime(ticket.created_at)}
-                </div>
-              </button>
-            ))}
-            {total > 20 && (
-              <div className='flex items-center justify-between pt-2'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  {t('Previous')}
-                </Button>
-                <span className='text-muted-foreground text-xs'>
-                  {page}
-                </span>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={page * 20 >= total}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  {t('Next')}
-                </Button>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className='rounded-lg border p-4'>
-            {!selected ? (
-              <p className='text-muted-foreground text-sm'>
-                {t('Select a ticket to view details.')}
-              </p>
-            ) : (
-              <TicketDetailPanel
-                ticket={selected}
-                reply={reply}
-                onReplyChange={setReply}
-                onSend={() => replyMutation.mutate()}
-                sending={replyMutation.isPending}
-                canReply={
-                  selected.status === 'open' && !ticketDisabled && enabled
-                }
-              />
-            )}
+            <div className='rounded-lg border p-4'>
+              {!selected ? (
+                <p className='text-muted-foreground text-sm'>
+                  {t('Select a ticket to view details.')}
+                </p>
+              ) : (
+                <TicketDetailPanel
+                  ticket={selected}
+                  reply={reply}
+                  onReplyChange={setReply}
+                  onSend={() => replyMutation.mutate()}
+                  sending={replyMutation.isPending}
+                  canReply={
+                    selected.status === 'open' && !ticketDisabled && enabled
+                  }
+                />
+              )}
+            </div>
           </div>
-        </div>
-      </SectionPageLayout.Content>
+        </SectionPageLayout.Content>
+      </SectionPageLayout>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
@@ -284,10 +287,15 @@ export function TicketsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant='outline' onClick={() => setCreateOpen(false)}>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setCreateOpen(false)}
+            >
               {t('Cancel')}
             </Button>
             <Button
+              type='button'
               disabled={
                 !title.trim() ||
                 !content.trim() ||
@@ -300,7 +308,7 @@ export function TicketsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SectionPageLayout>
+    </>
   )
 }
 
