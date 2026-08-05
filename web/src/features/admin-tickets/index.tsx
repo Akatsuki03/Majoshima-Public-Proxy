@@ -139,7 +139,13 @@ export function AdminTicketsPage() {
         toast.error(res.message || t('Failed to close ticket'))
         return
       }
-      toast.success(t('Ticket closed'))
+      if (res.message) {
+        // Ticket closed, but the automatic group promotion was skipped or
+        // failed; surface the reason so the admin can fix it manually.
+        toast.warning(res.message)
+      } else {
+        toast.success(t('Ticket closed'))
+      }
       setCloseOpen(false)
       setCloseMessage('')
       queryClient.invalidateQueries({ queryKey: ['admin-ticket', selectedId] })

@@ -250,47 +250,50 @@ func CloseAdminTicket(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	promoteUserGroupForResolvedToolCallTicket(c, ticket, closeReason)
+	promoteMessage := promoteUserGroupForResolvedToolCallTicket(c, ticket, closeReason)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "",
+		"message": promoteMessage,
 	})
 }
 
 // promoteUserGroupForResolvedToolCallTicket moves the ticket owner into the
 // configured tool-call group after an admin resolves their tool_call ticket,
-// so the tool-call guard stops blocking them. Failures only log; the ticket
-// close itself already succeeded.
-func promoteUserGroupForResolvedToolCallTicket(c *gin.Context, ticket *model.Ticket, closeReason string) {
+// so the tool-call guard stops blocking them. The returned message surfaces
+// skip/failure reasons to the closing admin; the ticket close itself already
+// succeeded, so failures never roll it back.
+func promoteUserGroupForResolvedToolCallTicket(c *gin.Context, ticket *model.Ticket, closeReason string) string {
 	setting := operation_setting.GetToolCallGuardSetting()
 	targetGroup := strings.TrimSpace(setting.TargetGroup)
 	if !setting.PromoteOnResolve || targetGroup == "" {
-		return
+		return ""
 	}
 	if ticket.Category != model.TicketCategoryToolCall || closeReason != model.TicketCloseReasonResolved {
-		return
+		return ""
 	}
 	if !ratio_setting.ContainsGroupRatio(targetGroup) {
 		common.SysError(fmt.Sprintf("tool call ticket %d resolved but target group %q is not in group ratio, skip promoting user %d", ticket.Id, targetGroup, ticket.UserId))
-		return
+		return fmt.Sprintf("ticket closed, but user was NOT moved to group %q: the group does not exist in group ratio settings", targetGroup)
 	}
-	currentGroup, err := model.GetUserGroup(ticket.UserId, true)
+	owner, err := model.GetUserById(ticket.UserId, false)
 	if err != nil {
-		common.SysError(fmt.Sprintf("tool call ticket %d resolved but failed to load user %d group: %s", ticket.Id, ticket.UserId, err.Error()))
-		return
+		common.SysError(fmt.Sprintf("tool call ticket %d resolved but failed to load user %d: %s", ticket.Id, ticket.UserId, err.Error()))
+		return fmt.Sprintf("ticket closed, but user group promotion failed: %s", err.Error())
 	}
+	currentGroup := owner.Group
 	if strings.EqualFold(currentGroup, targetGroup) {
-		return
+		return ""
 	}
 	if err := model.SetUserGroup(ticket.UserId, targetGroup); err != nil {
 		common.SysError(fmt.Sprintf("tool call ticket %d resolved but failed to promote user %d to group %q: %s", ticket.Id, ticket.UserId, targetGroup, err.Error()))
-		return
+		return fmt.Sprintf("ticket closed, but user group promotion failed: %s", err.Error())
 	}
 	recordManageAuditFor(c, ticket.UserId, "user.group_promote", map[string]interface{}{
 		"ticket_id":  ticket.Id,
 		"from_group": currentGroup,
 		"to_group":   targetGroup,
 	})
+	return ""
 }
 
 func DeleteAdminTicket(c *gin.Context) {
