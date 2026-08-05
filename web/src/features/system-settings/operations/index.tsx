@@ -68,6 +68,10 @@ const defaultOperationsSettings: OperationsSettings = {
   'ua_blacklist_setting.patterns': ['claude-cli', 'codex-cli'],
   'ua_blacklist_setting.exempt_user_groups': [],
   'ua_blacklist_setting.exempt_billing_groups': [],
+  'tool_call_guard_setting.enabled': false,
+  'tool_call_guard_setting.allowed_groups': ['tool'],
+  'tool_call_guard_setting.target_group': 'tool',
+  'tool_call_guard_setting.promote_on_resolve': true,
 }
 
 export function OperationsSettings() {

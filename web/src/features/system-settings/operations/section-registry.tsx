@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { SystemBehaviorSection } from '../general/system-behavior-section'
 import { RequestGuardSection } from './request-guard-section'
 import { TicketQuotaSection } from './ticket-quota-section'
+import { ToolCallGuardSection } from './tool-call-guard-section'
 import { UABlacklistSection } from './ua-blacklist-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
@@ -88,6 +89,24 @@ const OPERATIONS_SECTIONS = [
             settings['ua_blacklist_setting.exempt_user_groups'] ?? [],
           exemptBillingGroups:
             settings['ua_blacklist_setting.exempt_billing_groups'] ?? [],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'tool-call-guard',
+    titleKey: 'Tool Call Guard',
+    build: (settings: OperationsSettings) => (
+      <ToolCallGuardSection
+        defaultValues={{
+          enabled: settings['tool_call_guard_setting.enabled'] ?? false,
+          allowedGroups: settings['tool_call_guard_setting.allowed_groups'] ?? [
+            'tool',
+          ],
+          targetGroup:
+            settings['tool_call_guard_setting.target_group'] ?? 'tool',
+          promoteOnResolve:
+            settings['tool_call_guard_setting.promote_on_resolve'] ?? true,
         }}
       />
     ),

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 )
 
@@ -237,14 +239,57 @@ func CloseAdminTicket(c *gin.Context) {
 		return
 	}
 	adminId := c.GetInt("id")
-	err = model.CloseTicket(id, adminId, strings.TrimSpace(req.CloseReason), strings.TrimSpace(req.CloseMessage))
+	closeReason := strings.TrimSpace(req.CloseReason)
+	ticket, err := model.GetTicketById(id)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
+	err = model.CloseTicket(id, adminId, closeReason, strings.TrimSpace(req.CloseMessage))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	promoteUserGroupForResolvedToolCallTicket(c, ticket, closeReason)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
+	})
+}
+
+// promoteUserGroupForResolvedToolCallTicket moves the ticket owner into the
+// configured tool-call group after an admin resolves their tool_call ticket,
+// so the tool-call guard stops blocking them. Failures only log; the ticket
+// close itself already succeeded.
+func promoteUserGroupForResolvedToolCallTicket(c *gin.Context, ticket *model.Ticket, closeReason string) {
+	setting := operation_setting.GetToolCallGuardSetting()
+	targetGroup := strings.TrimSpace(setting.TargetGroup)
+	if !setting.PromoteOnResolve || targetGroup == "" {
+		return
+	}
+	if ticket.Category != model.TicketCategoryToolCall || closeReason != model.TicketCloseReasonResolved {
+		return
+	}
+	if !ratio_setting.ContainsGroupRatio(targetGroup) {
+		common.SysError(fmt.Sprintf("tool call ticket %d resolved but target group %q is not in group ratio, skip promoting user %d", ticket.Id, targetGroup, ticket.UserId))
+		return
+	}
+	currentGroup, err := model.GetUserGroup(ticket.UserId, true)
+	if err != nil {
+		common.SysError(fmt.Sprintf("tool call ticket %d resolved but failed to load user %d group: %s", ticket.Id, ticket.UserId, err.Error()))
+		return
+	}
+	if strings.EqualFold(currentGroup, targetGroup) {
+		return
+	}
+	if err := model.SetUserGroup(ticket.UserId, targetGroup); err != nil {
+		common.SysError(fmt.Sprintf("tool call ticket %d resolved but failed to promote user %d to group %q: %s", ticket.Id, ticket.UserId, targetGroup, err.Error()))
+		return
+	}
+	recordManageAuditFor(c, ticket.UserId, "user.group_promote", map[string]interface{}{
+		"ticket_id":  ticket.Id,
+		"from_group": currentGroup,
+		"to_group":   targetGroup,
 	})
 }
 

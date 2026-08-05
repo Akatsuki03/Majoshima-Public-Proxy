@@ -126,7 +126,23 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
-	common.SetContextKey(c, constant.ContextKeyRequestToolCall, service.RequestContainsToolCall(request))
+	requestHasToolCall := service.RequestContainsToolCall(request)
+	common.SetContextKey(c, constant.ContextKeyRequestToolCall, requestHasToolCall)
+
+	if requestHasToolCall && operation_setting.IsToolCallGuardEnabled() {
+		userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+		billingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
+		if !operation_setting.IsToolCallAllowedForGroups(userGroup, billingGroup) &&
+			!model.IsPrivilegedUser(c.GetInt("id")) {
+			newAPIError = types.NewErrorWithStatusCode(
+				errors.New("tool calls are not enabled for your current group, please submit a tool call declaration ticket in the console"),
+				types.ErrorCodeInvalidRequest,
+				http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(),
+			)
+			return
+		}
+	}
 
 	if ua := c.Request.UserAgent(); ua != "" {
 		userId := c.GetInt("id")

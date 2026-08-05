@@ -278,3 +278,29 @@ func TestHideTicketForUserKeepsDailyLimit(t *testing.T) {
 	_, err = ReplyTicket(ticket.Id, user.Id, false, "still there?")
 	require.Error(t, err)
 }
+
+func TestSetUserGroup(t *testing.T) {
+	if DB == nil {
+		t.Skip("database not initialized")
+	}
+
+	username := "group_set_" + common.GetRandomString(8)
+	user := &User{
+		Username:    username,
+		Password:    "password123",
+		DisplayName: username,
+		Role:        common.RoleCommonUser,
+		Status:      common.UserStatusEnabled,
+	}
+	require.NoError(t, user.Insert(0))
+	t.Cleanup(func() {
+		_ = DB.Unscoped().Delete(&User{}, "id = ?", user.Id)
+	})
+
+	require.Error(t, SetUserGroup(user.Id, "  "))
+
+	require.NoError(t, SetUserGroup(user.Id, "tool"))
+	group, err := GetUserGroup(user.Id, true)
+	require.NoError(t, err)
+	assert.Equal(t, "tool", group)
+}

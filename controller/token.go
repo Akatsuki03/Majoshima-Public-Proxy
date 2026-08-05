@@ -76,6 +76,26 @@ func getTokenRequestUserGroup(c *gin.Context) (string, error) {
 	return model.GetUserGroup(c.GetInt("id"), false)
 }
 
+// validateTokenGroupSelectable rejects token groups outside the user's usable
+// groups, so users cannot mint keys for privileged groups (e.g. admin) that
+// they cannot use themselves. Empty group means "follow user group" and is
+// always allowed. Responds with an API error and returns false on rejection.
+func validateTokenGroupSelectable(c *gin.Context, tokenGroup string) bool {
+	if strings.TrimSpace(tokenGroup) == "" {
+		return true
+	}
+	userGroup, err := getTokenRequestUserGroup(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return false
+	}
+	if !service.IsUserSelectableGroup(userGroup, tokenGroup) {
+		common.ApiErrorMsg(c, fmt.Sprintf("无权使用分组 %s 创建或修改令牌", tokenGroup))
+		return false
+	}
+	return true
+}
+
 func setTokenAutoGroups(c *gin.Context, token *model.Token, groups []string) bool {
 	if len(groups) == 0 {
 		if err := token.SetAutoGroups(nil); err != nil {
@@ -304,6 +324,9 @@ func AddToken(c *gin.Context) {
 			return
 		}
 	} else {
+		if !validateTokenGroupSelectable(c, token.Group) {
+			return
+		}
 		token.CrossGroupRetry = false
 		_ = token.SetAutoGroups(nil)
 	}
@@ -397,6 +420,14 @@ func UpdateToken(c *gin.Context) {
 	if statusOnly != "" {
 		cleanToken.Status = token.Status
 	} else {
+		// A token group different from the stored one must be selectable by the
+		// user; unchanged groups are not re-validated so existing tokens stay
+		// editable if group settings change later.
+		if token.Group != "auto" && token.Group != cleanToken.Group {
+			if !validateTokenGroupSelectable(c, token.Group) {
+				return
+			}
+		}
 		// If you add more fields, please also update token.Update()
 		cleanToken.Name = token.Name
 		cleanToken.ExpiredTime = token.ExpiredTime

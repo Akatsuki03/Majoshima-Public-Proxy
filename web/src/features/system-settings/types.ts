@@ -378,6 +378,10 @@ export type OperationsSettings = {
   'ua_blacklist_setting.patterns': string[]
   'ua_blacklist_setting.exempt_user_groups': string[]
   'ua_blacklist_setting.exempt_billing_groups': string[]
+  'tool_call_guard_setting.enabled': boolean
+  'tool_call_guard_setting.allowed_groups': string[]
+  'tool_call_guard_setting.target_group': string
+  'tool_call_guard_setting.promote_on_resolve': boolean
 }
 
 export type SecuritySettings = {

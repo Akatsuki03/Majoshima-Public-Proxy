@@ -1176,6 +1176,24 @@ func GetUserEmail(id int) (email string, err error) {
 	return email, err
 }
 
+// SetUserGroup moves a user into the given group, invalidating user and token
+// caches and recording a manage log. Used by the tool-call ticket resolution
+// hook; not a substitute for the full admin user-edit path.
+func SetUserGroup(userId int, group string) error {
+	group = strings.TrimSpace(group)
+	if group == "" {
+		return errors.New("group is required")
+	}
+	err := DB.Model(&User{}).Where("id = ?", userId).Update("group", group).Error
+	if err != nil {
+		return err
+	}
+	_ = InvalidateUserCache(userId)
+	_ = InvalidateUserTokensCache(userId)
+	RecordLog(userId, LogTypeManage, fmt.Sprintf("User group changed to %s (tool call ticket resolved)", group))
+	return nil
+}
+
 // GetUserGroup gets group from Redis first, falls back to DB if needed
 func GetUserGroup(id int, fromDB bool) (group string, err error) {
 	defer func() {
